@@ -1,0 +1,1153 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { FaSeedling, FaPlus, FaPaperPlane, FaCalendarAlt, FaFileExport, FaSpinner, FaBell, FaExclamationTriangle } from 'react-icons/fa';
+// import { scheduleService } from '../services/api';
+// Remove the curly braces if it's a default export
+
+// Fixed number of lot numbers
+const FIXED_LOT_NUMBERS = 32;
+
+// Generate fixed lot numbers array [1, 2, 3, ..., 32]
+const fixedLotNumbers = Array.from({ length: FIXED_LOT_NUMBERS }, (_, i) => i + 1);
+
+// Sample data
+const defaultSchedules = [
+  {
+    _id: "schedule-1",
+    name: "Schedule 1 (1 Sep - 5 Sep)",
+    startDate: "2025-09-01T00:00:00.000Z",
+    endDate: "2025-09-05T23:59:59.999Z",
+    groups: [
+      {
+        groupId: "tomato",
+        groupName: "Tomato",
+        varieties: [
+          {
+            varietyId: "tomato-roma",
+            varietyName: "Roma",
+            total: 1000,
+            completed: 500
+          },
+          {
+            varietyId: "tomato-cherry",
+            varietyName: "Cherry",
+            total: 800,
+            completed: 300
+          }
+        ]
+      }
+    ]
+  },
+  {
+    _id: "schedule-2",
+    name: "Schedule 2 (8 Sep - 12 Sep)",
+    startDate: "2025-09-08T00:00:00.000Z",
+    endDate: "2025-09-12T23:59:59.999Z",
+    groups: [
+      {
+        groupId: "pepper",
+        groupName: "Pepper",
+        varieties: [
+          {
+            varietyId: "pepper-bell",
+            varietyName: "Bell Pepper",
+            total: 600,
+            completed: 200
+          }
+        ]
+      }
+    ]
+  }
+];
+
+// Helper function to format date range
+const formatRange = (start, end) => {
+  try {
+    const s = new Date(start);
+    const e = new Date(end);
+    const opts = { day: 'numeric', month: 'short' };
+    return `${s.toLocaleDateString("en-GB", opts)} - ${e.toLocaleDateString("en-GB", opts)}`;
+  } catch {
+    return `${start} - ${end}`;
+  }
+};
+
+const ScheduleCard = ({ schedule, isSelected, onSelect }) => {
+  const periodHeader = schedule.name || formatRange(schedule.startDate, schedule.endDate);
+  const varietiesFlat = schedule.groups.flatMap(g => g.varieties || []);
+  const allCompleted = varietiesFlat.length > 0 && varietiesFlat.every(v => v.completed >= v.total);
+  const badgeClass = allCompleted 
+    ? 'bg-green-100 text-green-800' 
+    : 'bg-orange-100 text-orange-800';
+  const badgeText = allCompleted ? 'Completed' : 'In Progress';
+
+  return (
+    <div 
+      className={`bg-white rounded-lg shadow-md overflow-hidden border ${
+        isSelected ? 'ring-2 ring-blue-500 border-blue-300' : 'border-gray-100 hover:border-gray-200'
+      } hover:shadow-lg transition-all duration-300 mb-4 cursor-pointer`}
+      onClick={onSelect}
+    >
+      <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-4 flex justify-between items-center">
+        <h3 className="text-lg font-semibold">{periodHeader}</h3>
+        <span className={`px-3 py-1 rounded-full text-xs font-bold ${badgeClass}`}>
+          {badgeText}
+        </span>
+      </div>
+      <div className="p-4">
+        {schedule.groups.map(group => (
+          <div key={group.groupId} className="mb-4">
+            <div className="font-medium text-sm mb-2 px-2 py-1 bg-gray-50 text-gray-700 rounded inline-flex items-center">
+              <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+              {group.groupName}
+            </div>
+            {group.varieties.map(variety => {
+              const percent = variety.total > 0 ? (variety.completed / variety.total) * 100 : 0;
+              const progressColor = percent === 100 ? 'bg-green-500' : 'bg-blue-500';
+              return (
+                <div key={variety.varietyId} className="mb-4 p-3 bg-white border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className="font-medium text-gray-800">{variety.varietyName}</h4>
+                    <span className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded-full">
+                      {variety.completed.toLocaleString("en-IN")}/{variety.total.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500 mb-2">
+                    Lot Numbers: 1 to {FIXED_LOT_NUMBERS}
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2.5">
+                    <div 
+                      className={`h-2.5 rounded-full ${progressColor} transition-all duration-500 ease-in-out`}
+                      style={{ width: `${percent}%` }}
+                    ></div>
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span className="text-xs text-gray-500">0%</span>
+                    <span className="text-xs font-medium">{Math.round(percent)}%</span>
+                    <span className="text-xs text-gray-500">100%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const VarietyForm = ({ group, variety, onSubmit }) => {
+  const [lotNumber, setLotNumber] = useState('');
+  const [rows, setRows] = useState([{ date: '', details: '' }]);
+
+  const handleAddRow = () => {
+    setRows([...rows, { date: '', details: '' }]);
+  };
+
+  const handleRowChange = (index, field, value) => {
+    const newRows = [...rows];
+    newRows[index] = { ...newRows[index], [field]: value };
+    setRows(newRows);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!lotNumber) {
+      alert("Please select a Lot Number first.");
+      return;
+    }
+
+    const validItems = rows.filter(row => row.date && row.details);
+    if (validItems.length === 0) {
+      alert("Please add at least one valid item before submitting.");
+      return;
+    }
+
+    onSubmit({
+      varietyId: variety.varietyId,
+      lotNumber,
+      items: validItems
+    });
+
+    // Reset form
+    setLotNumber('');
+    setRows([{ date: '', details: '' }]);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="mb-6 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold text-gray-800">
+          {group.groupName} - {variety.varietyName}
+        </h3>
+      </div>
+      
+      <div className="mb-4">
+        <label htmlFor={`lot-${variety.varietyId}`} className="block text-sm font-medium text-gray-700 mb-1">
+          Select Lot Number
+        </label>
+        <select
+          id={`lot-${variety.varietyId}`}
+          className="w-full p-2 border border-gray-300 rounded-md"
+          value={lotNumber}
+          onChange={(e) => setLotNumber(e.target.value)}
+          style={{ margin: '0.5rem 0 1rem 0' }}
+        >
+          <option value="">-- Select Lot --</option>
+          {fixedLotNumbers.map(num => (
+            <option key={num} value={num}>Lot No. {num}</option>
+          ))}
+        </select>
+      </div>
+
+      {rows.map((row, index) => (
+        <div key={index} className="flex gap-2 mb-2">
+          <input
+            type="date"
+            className="flex-1 p-2 border border-gray-300 rounded-md"
+            value={row.date}
+            onChange={(e) => handleRowChange(index, 'date', e.target.value)}
+            style={{ margin: '0.5rem 0' }}
+          />
+          <input
+            type="text"
+            placeholder="Enter details"
+            className="flex-1 p-2 border border-gray-300 rounded-md"
+            value={row.details}
+            onChange={(e) => handleRowChange(index, 'details', e.target.value)}
+            style={{ margin: '0.5rem 0' }}
+          />
+        </div>
+      ))}
+
+      <div className="flex gap-2 mt-4">
+        <button
+          type="button"
+          onClick={handleAddRow}
+          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+        >
+          <FaPlus className="inline mr-1" /> Add Row
+        </button>
+        <button
+          type="submit"
+          className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors flex-1"
+        >
+          <FaPaperPlane className="inline mr-1" /> Submit Data
+        </button>
+      </div>
+    </form>
+  );
+};
+
+const NotificationPage = () => {
+  const [error, setError] = useState(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  
+  // Add a simple loading spinner component
+  const LoadingSpinner = () => (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <FaSpinner className="animate-spin text-blue-500 text-4xl" />
+      <span className="ml-3 text-gray-600">Loading schedules...</span>
+    </div>
+  );
+  
+  // Error message component
+  const ErrorMessage = ({ message, onRetry }) => (
+    <div className="bg-red-50 border-l-4 border-red-400 p-4 my-4">
+      <div className="flex">
+        <div className="flex-shrink-0">
+          <FaExclamationTriangle className="h-5 w-5 text-red-400" />
+        </div>
+        <div className="ml-3">
+          <p className="text-sm text-red-700">
+            {message}
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                className="ml-2 text-sm font-medium text-red-700 underline hover:text-red-600"
+              >
+                Retry
+              </button>
+            )}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+  const [selectedScheduleId, setSelectedScheduleId] = useState('');
+  const [schedules, setSchedules] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  
+  // Fetch schedules on component mount
+  const fetchSchedules = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Try to fetch from API
+      const data = await scheduleService.getSchedules();
+      if (data && Array.isArray(data)) {
+        setSchedules(data);
+      } else {
+        // Fallback to default schedules if API returns invalid data
+        console.warn('Invalid data format from API, using default schedules');
+        setSchedules(defaultSchedules);
+      }
+    } catch (error) {
+      console.error('Failed to fetch schedules:', error);
+      setError('Failed to load schedules. Please check your connection and try again.');
+      // Fallback to default schedules if API fails
+      setSchedules(defaultSchedules);
+    } finally {
+      setIsLoading(false);
+      setIsInitialLoad(false);
+    }
+  };
+  
+  useEffect(() => {
+    fetchSchedules();
+  }, []);
+
+  // Function to export data to CSV
+  const exportToCSV = (data, filename) => {
+    if (!data || data.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    // Flatten the data structure for CSV
+    const flattenedData = [];
+    
+    data.forEach(schedule => {
+      schedule.groups.forEach(group => {
+        group.varieties.forEach(variety => {
+          flattenedData.push({
+            'Schedule': schedule.name,
+            'Start Date': new Date(schedule.startDate).toLocaleDateString(),
+            'End Date': new Date(schedule.endDate).toLocaleDateString(),
+            'Group': group.groupName,
+            'Variety': variety.varietyName,
+            'Total Seeds': variety.total,
+            'Completed': variety.completed || 0,
+            'Slot Number': variety.slotNumber || 'N/A',
+            'Progress': `${Math.round(((variety.completed || 0) / variety.total) * 100)}%`
+          });
+        });
+      });
+    });
+
+    if (flattenedData.length === 0) {
+      alert('No data available to export');
+      return;
+    }
+
+    // Extract headers from the first object
+    const headers = Object.keys(flattenedData[0]);
+    
+    // Create CSV content
+    let csvContent = headers.join(',') + '\n';
+    
+    // Add rows
+    flattenedData.forEach(item => {
+      const row = headers.map(header => {
+        // Escape quotes and wrap in quotes
+        const value = item[header] !== null ? item[header].toString().replace(/"/g, '""') : '';
+        return `"${value}"`;
+      });
+      csvContent += row.join(',') + '\n';
+    });
+
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  
+  // New schedule modal state
+  const [modalView, setModalView] = useState(null);
+  const [newSchedule, setNewSchedule] = useState({
+    name: '',
+    startDate: '',
+    endDate: ''
+  });
+  const [scheduleError, setScheduleError] = useState('');
+  
+  // New state for variety form
+  const [showVarietyForm, setShowVarietyForm] = useState(false);
+  const [currentGroup, setCurrentGroup] = useState({
+    groupId: '',
+    groupName: '',
+    varieties: []
+  });
+  const [newVariety, setNewVariety] = useState({
+    slotNumber: '',
+    date: '',
+    varietyName: '',
+    total: '',
+    completed: 0
+  });
+
+  // Reset new schedule form
+  const resetNewScheduleForm = () => {
+    setNewSchedule({
+      name: '',
+      startDate: '',
+      endDate: ''
+    });
+    setScheduleError('');    
+    // Reset variety form state when closing the modal
+    setShowVarietyForm(false);
+    setCurrentGroup({
+      groupId: '',
+      groupName: '',
+      varieties: []
+    });
+    setNewVariety({
+      slotNumber: '',
+      varietyName: '',
+      total: '',
+      completed: 0
+    });
+  };
+
+  // Handle date changes and auto-calculate end date
+  const handleDateChange = (e) => {
+    const { name, value } = e.target;
+    setNewSchedule(prev => {
+      const updated = { ...prev, [name]: value };
+      
+      // If start date is changed and end date is empty, set end date to 4 days after start
+      if (name === 'startDate' && value && !prev.endDate) {
+        const start = new Date(value);
+        const end = new Date(start);
+        end.setDate(start.getDate() + 4); // 4 days after start = 5 days total
+        updated.endDate = end.toISOString().split('T')[0];
+      }
+      
+      return updated;
+    });
+  };
+
+  // Handle variety form input changes
+  const handleVarietyChange = (e) => {
+    const { name, value } = e.target;
+    setNewVariety(prev => ({
+      ...prev,
+      [name]: name === 'total' || name === 'completed' ? parseInt(value) || 0 : value
+    }));
+  };
+
+  // Handle group form input changes
+  const handleGroupChange = (e) => {
+    const { name, value } = e.target;
+    setCurrentGroup(prev => ({
+      ...prev,
+      [name]: value,
+      groupId: name === 'groupName' ? value.toLowerCase().replace(/\s+/g, '-') : prev.groupId
+    }));
+  };
+
+  // Add new variety to current group
+  const handleAddVariety = (e) => {
+    e.preventDefault();
+    if (!newVariety.varietyName || !newVariety.total) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    const varietyId = `${currentGroup.groupId}-${newVariety.varietyName.toLowerCase().replace(/\s+/g, '-')}`;
+    
+    const updatedVarieties = [
+      ...currentGroup.varieties,
+      {
+        varietyId,
+        varietyName: newVariety.varietyName,
+        total: parseInt(newVariety.total) || 0,
+        completed: parseInt(newVariety.completed) || 0,
+        slotNumber: newVariety.slotNumber
+      }
+    ];
+
+    setCurrentGroup(prev => ({
+      ...prev,
+      varieties: updatedVarieties
+    }));
+
+    // Reset variety form but keep the date
+    setNewVariety(prev => ({
+      slotNumber: '',
+      date: prev.date, // Keep the same date for the next entry
+      varietyName: '',
+      total: '',
+      completed: 0
+    }));
+  };
+
+  // Save group and close the form
+  const handleSaveGroup = () => {
+    if (!currentGroup.groupName || currentGroup.varieties.length === 0) {
+      alert('Please add at least one variety to the group');
+      return;
+    }
+
+    // Update the schedule with the new group
+    setSchedules(prev => 
+      prev.map(schedule => 
+        schedule._id === selectedScheduleId
+          ? {
+              ...schedule,
+              groups: [
+                ...(schedule.groups || []),
+                {
+                  groupId: currentGroup.groupId,
+                  groupName: currentGroup.groupName,
+                  varieties: currentGroup.varieties
+                }
+              ]
+            }
+          : schedule
+      )
+    );
+
+    // Reset and close the form
+    setModalView(null);
+    resetNewScheduleForm();
+  };
+
+  // Format date range for display
+  const formatDateRange = (start, end) => {
+    try {
+      const s = new Date(start);
+      const e = new Date(end);
+      const opts = { day: 'numeric', month: 'short' };
+      return `${s.toLocaleDateString("en-GB", opts)} - ${e.toLocaleDateString("en-GB", opts)}`;
+    } catch (error) {
+      console.error('Error formatting date range:', error);
+      return 'Invalid date range';
+    }
+  };
+
+  // Handle form submission for creating a new schedule
+  const handleSubmitSchedule = async (e) => {
+    e.preventDefault();
+    
+    // Validate dates
+    if (!newSchedule.startDate || !newSchedule.endDate) {
+      setScheduleError('Please select both start and end dates');
+      return;
+    }
+
+    const start = new Date(newSchedule.startDate);
+    const end = new Date(newSchedule.endDate);
+    const diffTime = Math.abs(end - start);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end days
+
+    if (diffDays > 5) {
+      setScheduleError('Schedule duration cannot exceed 5 days');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Create new schedule object
+      const scheduleData = {
+        name: newSchedule.name || `Schedule (${formatDateRange(newSchedule.startDate, newSchedule.endDate)})`,
+        startDate: new Date(newSchedule.startDate).toISOString(),
+        endDate: new Date(newSchedule.endDate).toISOString(),
+        status: 'pending',
+        groups: []
+      };
+
+      // Save to backend using the schedule service
+      const savedSchedule = await scheduleService.createSchedule(scheduleData);
+      
+      // Update local state with the saved schedule (including _id from backend)
+      setSchedules(prev => [...prev, savedSchedule]);
+      
+      // Select the new schedule
+      setSelectedScheduleId(savedSchedule._id);
+      
+      // Show variety form after creating schedule
+      setShowVarietyForm(true);
+      
+      // Reset form
+      setNewSchedule({
+        name: '',
+        startDate: '',
+        endDate: ''
+      });
+      
+      // Close modal
+      setModalView(null);
+      
+      // Clear any previous errors
+      setScheduleError('');
+    } catch (error) {
+      console.error('Failed to save schedule:', error);
+      setScheduleError('Failed to save schedule. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Add blinking animation to the notification page
+  useEffect(() => {
+    // Only start blinking after initial load
+    if (!isLoading) {
+      const blinkInterval = setInterval(() => {
+        const elements = document.querySelectorAll('.notification-content');
+        elements.forEach(el => {
+          if (el) {
+            el.style.transition = 'background-color 1s ease-in-out';
+            el.style.backgroundColor = el.style.backgroundColor === 'rgba(240, 255, 244, 0.8)' 
+              ? 'rgba(255, 255, 255, 0.8)' 
+              : 'rgba(240, 255, 244, 0.8)';
+          }
+        });
+      }, 2000);
+      
+      return () => clearInterval(blinkInterval);
+    }
+  }, [isLoading]); // Only run when loading state changes
+
+  // Styles
+  const styles = {
+    container: {
+      maxWidth: '1400px',
+      margin: '2rem auto',
+      padding: '0 1rem',
+    },
+    formInput: {
+      margin: '0.5rem 0 1rem 0',
+    },
+    formGroup: {
+      marginBottom: '1.5rem',
+    },
+    header: {
+      textAlign: 'center',
+      marginBottom: '2rem',
+      paddingBottom: '1rem',
+      borderBottom: '2px solid #e2e8f0',
+    },
+    mainContent: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '1.5rem',
+    },
+    scheduleHeader: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '1rem',
+      flexWrap: 'wrap',
+      gap: '1rem',
+    },
+    card: {
+      backgroundColor: 'white',
+      borderRadius: '0.75rem',
+      padding: '1.5rem',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+      transition: 'all 0.3s ease',
+    },
+    cardHeader: {
+      fontSize: '1.25rem',
+      fontWeight: '600',
+      color: '#1a202c',
+      marginBottom: '1.5rem',
+      paddingBottom: '0.75rem',
+      borderBottom: '2px solid #e2e8f0',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+  };
+
+  useEffect(() => {
+    // Simulate API call
+    const fetchSchedules = async () => {
+      try {
+        // In a real app, you would fetch this from your API
+        // const response = await fetch('/api/schedules');
+        // const data = await response.json();
+        // setSchedules(data);
+        setSchedules(defaultSchedules);
+      } catch (error) {
+        console.error('Error fetching schedules:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSchedules();
+  }, []);
+
+  const handleSubmitVarietyForm = async (formData) => {
+    try {
+      // In a real app, you would send this to your API
+      // const response = await fetch('http://localhost:3000/api/schedule-task', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify(formData),
+      // });
+      // const data = await response.json();
+      
+      console.log('Form submitted:', formData);
+      alert(`Data for variety ${formData.varietyId} submitted successfully!`);
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      alert('Failed to submit data. Please try again.');
+    }
+  };
+
+  if (isLoading || !schedules) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center p-8 bg-white rounded-lg shadow-md">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-700 font-medium">Loading schedules...</p>
+          <p className="text-sm text-gray-500 mt-2">Please wait while we load your data</p>
+        </div>
+      </div>
+    );
+  }
+
+  const selectedSchedule = schedules.find(s => s._id === selectedScheduleId);
+  const varietyForms = selectedSchedule 
+    ? selectedSchedule.groups.flatMap(g => g.varieties || []) 
+    : [];
+
+  return (
+    <div style={styles.container} className="notification-content min-h-screen p-4">
+      {/* New Schedule Modal */}
+      {(modalView === 'new-schedule' || modalView === 'add-variety') && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-lg animate-fade-in-up">
+            <div className="flex justify-between items-center mb-4 border-b pb-3">
+              <h2 className="text-lg font-semibold text-gray-800 flex items-center">
+                <FaCalendarAlt className="mr-2 text-green-600" />
+                Create New Notification Schedule
+              </h2>
+              <button
+                className="text-gray-500 hover:text-red-500 text-2xl"
+                onClick={() => {
+                  setModalView(null);
+                  resetNewScheduleForm();
+                }}
+              >
+                &times;
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmitSchedule} className="mt-4">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Schedule Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    placeholder="e.g., Summer Sowing Schedule"
+                    value={newSchedule.name}
+                    onChange={(e) => setNewSchedule(prev => ({ ...prev, name: e.target.value }))}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Start Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="startDate"
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    value={newSchedule.startDate}
+                    onChange={handleDateChange}
+                    min={new Date().toISOString().split('T')[0]}
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    End Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="endDate"
+                    className="w-full p-2 border border-gray-300 rounded-md"
+                    value={newSchedule.endDate}
+                    onChange={handleDateChange}
+                    min={newSchedule.startDate || new Date().toISOString().split('T')[0]}
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {newSchedule.startDate && newSchedule.endDate ? 
+                      `Duration: ${Math.ceil((new Date(newSchedule.endDate) - new Date(newSchedule.startDate)) / (1000 * 60 * 60 * 24)) + 1} days` : 
+                      'Select start and end dates (5 days total)'}
+                  </p>
+                </div>
+                
+                {scheduleError && (
+                  <div className="text-red-500 text-sm mt-2">
+                    {scheduleError}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    setModalView(null);
+                    resetNewScheduleForm();
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[120px]"
+                >
+                  {isSaving ? (
+                    <>
+                      <FaSpinner className="animate-spin mr-2" />
+                      Creating...
+                    </>
+                  ) : 'Create Schedule'}
+                </button>
+              </div>
+            </form>
+            
+            {/* Variety Form - Shows after schedule is created */}
+            {modalView === 'add-variety' && (
+              <div className="mt-8 pt-6 border-t border-gray-200 overflow-scroll h-50">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                  Add Varieties to Schedule: {newSchedule.name}
+                </h3>
+                
+                {/* Group Information */}
+                <div className="bg-gray-50 p-4 rounded-lg mb-6 ">
+                  <h4 className="text-md font-medium text-gray-700 mb-3">Group Information</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Group Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="groupName"
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        value={currentGroup.groupName}
+                        onChange={handleGroupChange}
+                        required
+                      />
+                    </div>
+                    <div className="opacity-50">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Group ID (auto-generated)
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full p-2 border border-gray-300 rounded-md bg-gray-100"
+                        value={currentGroup.groupId}
+                        readOnly
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Add Variety Form */}
+                <div className="mb-6">
+                  <h4 className="text-md font-medium text-gray-700 mb-3">Add New Variety</h4>
+                  <form onSubmit={handleAddVariety} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Slot Number
+                        </label>
+                        <select
+                          name="slotNumber"
+                          className="w-full p-2 border border-gray-300 rounded-md"
+                          value={newVariety.slotNumber}
+                          onChange={handleVarietyChange}
+                        >
+                          <option value="">Select Slot</option>
+                          {fixedLotNumbers.map(num => (
+                            <option key={num} value={num}>Slot {num}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Variety Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="varietyName"
+                          className="w-full p-2 border border-gray-300 rounded-md"
+                          value={newVariety.varietyName}
+                          onChange={handleVarietyChange}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Total Seeds <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          name="total"
+                          min="1"
+                          className="w-full p-2 border border-gray-300 rounded-md"
+                          value={newVariety.total}
+                          onChange={handleVarietyChange}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Completed Seeds
+                        </label>
+                        <input
+                          type="number"
+                          name="completed"
+                          min="0"
+                          max={newVariety.total || ''}
+                          className="w-full p-2 border border-gray-300 rounded-md"
+                          value={newVariety.completed}
+                          onChange={handleVarietyChange}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                      >
+                        Add Variety
+                      </button>
+                    </div>
+                  </form>
+                </div>
+                
+                {/* Added Varieties List */}
+                {currentGroup.varieties.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-md font-medium text-gray-700 mb-3">
+                      Added Varieties ({currentGroup.varieties.length})
+                    </h4>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Slot
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Variety Name
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Total Seeds
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Completed
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Remaining
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {currentGroup.varieties.map((variety, index) => (
+                            <tr key={index}>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                {variety.slotNumber || '-'}
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {variety.varietyName}
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                {variety.total.toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                {variety.completed.toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                {(variety.total - variety.completed).toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Action Buttons */}
+                <div className="flex justify-between pt-4 border-t border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setModalView('new-schedule')}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    Back to Schedule
+                  </button>
+                  <div className="space-x-3">
+                    <button
+                      type="button"
+                      onClick={resetNewScheduleForm}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveGroup}
+                      className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700"
+                      disabled={!currentGroup.groupName || currentGroup.varieties.length === 0}
+                    >
+                      Save Group & Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <header style={styles.header}>
+        <h1 className="text-3xl md:text-4xl font-bold text-gray-800 flex items-center justify-center">
+          <FaSeedling className="mr-3 text-green-600" />
+          Sowing & Schedule Management
+        </h1>
+        <p className="mt-2 text-gray-600">Track and manage your sowing schedules efficiently</p>
+      </header>
+
+      <div className='flex flex-col overflow-scroll'>
+        <div style={styles.scheduleHeader}>
+          <div className="flex-1 min-w-[300px] flex gap-4">
+            <button
+              onClick={() => setModalView('new-schedule')}
+              className="px-4 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors flex items-center whitespace-nowrap"
+            >
+              <FaPlus className="mr-2" /> New Notification Schedule
+            </button>
+            <div className="flex-1">
+              <label htmlFor="schedule-select" className="block text-gray-700 font-semibold mb-2">
+                Select Schedule
+              </label>
+              <select
+                id="schedule-select"
+                className="w-full p-2 border border-gray-300 rounded-md bg-white shadow-sm"
+                value={selectedScheduleId}
+                onChange={(e) => setSelectedScheduleId(e.target.value)}
+              >
+                <option value="">-- Select a Schedule --</option>
+                {schedules.map(schedule => (
+                  <option key={schedule._id} value={schedule._id}>
+                    {schedule.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {selectedSchedule && (
+            <div className="flex-1 min-w-[300px] bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  📋 {selectedSchedule.name || 'Selected Schedule'}
+                </h3>
+                <span className="text-sm px-3 py-1 bg-blue-100 text-blue-800 rounded-full">
+                  {varietyForms.length} forms available
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className='flex flex-row'>
+          <div className='flex-1'>
+            <div style={styles.card}>
+              <div style={styles.cardHeader}>
+                <span>📝 Data Entry Forms</span>
+              </div>
+              {varietyForms.length > 0 ? (
+                varietyForms.map((variety) => {
+                  const group = selectedSchedule.groups.find(g => 
+                    g.varieties.some(v => v.varietyId === variety.varietyId)
+                  );
+                  return (
+                    <VarietyForm
+                      key={variety.varietyId}
+                      group={group}
+                      variety={variety}
+                      onSubmit={handleSubmitVarietyForm}
+                    />
+                  );
+                })
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  {selectedScheduleId 
+                    ? "No varieties found for the selected schedule."
+                    : "Please select a schedule to view available forms."
+                  }
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex-1">
+            <div style={styles.card}>
+              <div style={styles.cardHeader}>
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center">
+                    <span>📅 Sowing Schedules</span>
+                    <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                      {schedules.length} schedules
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => exportToCSV(schedules, 'sowing_schedules')}
+                    className="flex items-center px-3 py-1 text-sm text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors"
+                    title="Export to CSV"
+                  >
+                    <FaFileExport className="mr-1" /> Export CSV
+                  </button>
+                </div>
+                <span className="text-sm font-normal text-gray-500">
+                  Last updated: {new Date().toLocaleDateString()}
+                </span>
+              </div>
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                {schedules.map(schedule => (
+                  <ScheduleCard 
+                    key={schedule._id} 
+                    schedule={schedule}
+                    isSelected={selectedScheduleId === schedule._id}
+                    onSelect={() => setSelectedScheduleId(schedule._id)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default NotificationPage;
