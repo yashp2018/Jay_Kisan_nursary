@@ -12,7 +12,7 @@
     "$oid": "68ca1ac0fd538cc6b3828956"
   },
   "staffId": "staff001",
-  "password": "pass",
+  "password": "staffpass",
   "role": "staff",
   "__v": 0
 }]
