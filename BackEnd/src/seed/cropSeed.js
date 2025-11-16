@@ -1,17 +1,17 @@
-// src/seed/cropSeed.js
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
 import CropGroup from '../models/CropGroup.js';
 import CropVariety from '../models/CropVariety.js';
 
-dotenv.config();
-
-const seedData = async () => {
+const seedCrops = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    // IDEMPOTENCY CHECK: Do not seed if crop groups already exist
+    const existingGroupCount = await CropGroup.countDocuments();
+    if (existingGroupCount > 0) {
+      console.log('✅ Crop data already exists. Skipping crop seeding.');
+      return; 
+    }
 
-    await CropGroup.deleteMany();
-    await CropVariety.deleteMany();
+    // WARNING: Original code ran deleteMany. Removed for safety.
+    // To wipe and re-seed, manually run `await CropGroup.deleteMany();` before insertMany.
 
     const groups = await CropGroup.insertMany([
       { name: 'Vegetables' },
@@ -38,12 +38,11 @@ const seedData = async () => {
       { name: 'Mint', group: groupMap['Herbs'] },
     ]);
 
-    console.log('✅ Crop data seeded!');
-    process.exit();
+    console.log('🌱 Successfully seeded crop data.');
   } catch (error) {
-    console.error('❌ Seeding error:', error);
-    process.exit(1);
+    console.error('❌ Crop seeding failed:', error.message);
+    throw error; // Propagate error
   }
 };
 
-seedData();
+export default seedCrops;
