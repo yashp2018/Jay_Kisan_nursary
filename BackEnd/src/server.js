@@ -1,4 +1,4 @@
-// src/server.js
+// BackEnd/src/server.js
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
@@ -6,6 +6,12 @@ import cors from 'cors';
 dotenv.config(); // load env first
 
 import connectDB from "./config/db.js"; // ensure path matches your repo
+
+// --- NEW IMPORTS FOR SEEDING ---
+import seedUsers from './seed/userSeeder.js'; 
+import seedCrops from './seed/cropSeed.js';
+import seedFarmers from './seed/seedFarmers.js';
+// -------------------------------
 
 // routes
 import userRoutes from './routes/userRoutes.js';
@@ -29,10 +35,11 @@ import scriptRoutes from './routes/scripts.js';
 
 const app = express();
 
-// Production CORS - allow your Render frontend domain
+// Production CORS - adjust origin to your Vercel frontend domain after deployment
 app.use(cors({
+  // Use VERCEL_URL or the actual domain in production instead of hardcoding render.com
   origin: [
-    "https://your-frontend-app.onrender.com",
+   // Placeholder: Change this!
     "http://localhost:5173" // for local development
   ],
   credentials: true,
@@ -43,6 +50,7 @@ app.use(cors({
 // Body parser
 app.use(express.json());
 app.use((req, res, next) => {
+  // Console logging is fine in development/staging, but can be noisy in production serverless environments.
   console.log(`${req.method} ${req.originalUrl} - body: ${JSON.stringify(req.body)}`);
   next();
 });
@@ -85,25 +93,47 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-const PORT = process.env.PORT || 5000;
+// =======================================================
+// CRITICAL: SERVERLESS-COMPATIBLE STARTUP & SEEDING LOGIC
+// =======================================================
 
-const start = async () => {
-  try {
-    // DEBUG LOG: tell us whether the runtime environment has MONGO_URI set (boolean)
-    console.log("DEBUG: process.env.MONGO_URI present? ->", !!process.env.MONGO_URI);
+let isConnected = false; 
 
-    // Wait for DB connection first (throws if connection fails)
-    await connectDB();
+/**
+ * Connects to the database and runs the seeding function if the SEED_DATABASE flag is set.
+ * This function will run during the cold start of the Vercel function.
+ */
+const runDatabaseSetup = async () => {
+  if (!isConnected) {
+    try {
+      console.log("DEBUG: Attempting to connect to MongoDB...");
+      await connectDB();
+      isConnected = true;
+      console.log("DEBUG: MongoDB connection established.");
 
-    // Only start HTTP server if DB connection succeeded
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-    });
-  } catch (err) {
-    console.error("Failed to start server due to DB error:", err?.message || err);
-    // Exit so Render marks deploy as failed and you fix env
-    process.exit(1);
+      // Check the environment variable to safely trigger seeding ONLY WHEN REQUESTED
+      if (process.env.SEED_DATABASE === 'true') {
+        console.log('*** SEEDING INITIATED VIA SERVER STARTUP (One-Time Execution) ***');
+        await seedUsers();
+        await seedCrops();
+        await seedFarmers();
+        console.log('*** SEEDING SEQUENCE FINISHED ***');
+      }
+
+    } catch (err) {
+      // In a serverless function, log the error but allow the function to finish.
+      console.error("Failed to establish DB connection:", err?.message || err);
+      // We do NOT exit(1) as the process is expected to run as a lambda function.
+    }
   }
 };
 
-start();
+// Start the asynchronous setup process immediately on module load (cold start).
+runDatabaseSetup();
+
+// REMOVED: const PORT = process.env.PORT || 5000;
+// REMOVED: const start = async () => { ... app.listen(PORT, ...); ... };
+// REMOVED: start();
+
+// Final required step for Vercel: Export the configured app instance
+export default app;
