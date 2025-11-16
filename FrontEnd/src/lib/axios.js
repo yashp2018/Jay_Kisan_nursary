@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // ------------------- NEW CODE START -------------------
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://jay-kisan-nursary-7kpt.onrender.com/api';
 
 const instance = axios.create({
   // Use the environment variable, which will be set to '/api' in production
