@@ -1,17 +1,19 @@
-// BackEnd/src/server.js
+// BackEnd/src/server.js (FIXED for RENDER)
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 
-dotenv.config(); // load env first
+// IMPORTANT: Render sets its environment variables automatically, but this line ensures 
+// it loads any .env file variables if present (for local testing/setup).
+dotenv.config(); 
 
 import connectDB from "./config/db.js"; // ensure path matches your repo
 
-// --- NEW IMPORTS FOR SEEDING ---
+// --- SEEDING IMPORTS (Required for conditional seeding) ---
 import seedUsers from './seed/userSeeder.js'; 
 import seedCrops from './seed/cropSeed.js';
 import seedFarmers from './seed/seedFarmers.js';
-// -------------------------------
+// -----------------------------------------------------------
 
 // routes
 import userRoutes from './routes/userRoutes.js';
@@ -35,11 +37,12 @@ import scriptRoutes from './routes/scripts.js';
 
 const app = express();
 
-// Production CORS - adjust origin to your Vercel frontend domain after deployment
+// RENDER CORS - IMPORTANT: Use process.env.FRONTEND_URL for dynamic linking on Render.
+// You must set the FRONTEND_URL environment variable on Render if deploying separately.
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173"; 
 app.use(cors({
-  // Use VERCEL_URL or the actual domain in production instead of hardcoding render.com
   origin: [
-     "https://your-frontend-app.onrender.com", // Placeholder: Change this!
+    FRONTEND_URL, // Render will replace this with your actual frontend URL
     "http://localhost:5173" // for local development
   ],
   credentials: true,
@@ -50,12 +53,11 @@ app.use(cors({
 // Body parser
 app.use(express.json());
 app.use((req, res, next) => {
-  // Console logging is fine in development/staging, but can be noisy in production serverless environments.
   console.log(`${req.method} ${req.originalUrl} - body: ${JSON.stringify(req.body)}`);
   next();
 });
 
-// --- Routes (after CORS + body parser)
+// --- Routes
 app.use('/api/user', userRoutes);
 app.use('/api/protected', protectedRoutes);
 app.use('/api/farmers', farmerRoutes);
@@ -80,12 +82,12 @@ app.get("/health", (req, res) =>
   res.json({ status: "ok", time: new Date().toISOString() })
 );
 
-// Root route (friendly)
+// Root route
 app.get("/", (req, res) => {
   res.send("API is running. Use /health for status or /api/* endpoints.");
 });
 
-// Error handler for CORS rejections (friendly message)
+// Error handler
 app.use((err, req, res, next) => {
   if (err && err.message && err.message.startsWith('CORS')) {
     return res.status(403).json({ message: err.message });
@@ -93,47 +95,37 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-// =======================================================
-// CRITICAL: SERVERLESS-COMPATIBLE STARTUP & SEEDING LOGIC
-// =======================================================
+// RENDER REQUIRES BINDING TO THE PROCESS.ENV.PORT VARIABLE
+const PORT = process.env.PORT || 5000;
 
-let isConnected = false; 
+const start = async () => {
+  try {
+    console.log("DEBUG: process.env.MONGO_URI present? ->", !!process.env.MONGO_URI);
 
-/**
- * Connects to the database and runs the seeding function if the SEED_DATABASE flag is set.
- * This function will run during the cold start of the Vercel function.
- */
-const runDatabaseSetup = async () => {
-  if (!isConnected) {
-    try {
-      console.log("DEBUG: Attempting to connect to MongoDB...");
-      await connectDB();
-      isConnected = true;
-      console.log("DEBUG: MongoDB connection established.");
+    // 1. Wait for DB connection first (throws if connection fails)
+    await connectDB();
 
-      // Check the environment variable to safely trigger seeding ONLY WHEN REQUESTED
-      if (process.env.SEED_DATABASE === 'true') {
+    // 2. Conditional Seeding (Runs only if SEED_DATABASE=true is set in Render Environment)
+    if (process.env.SEED_DATABASE === 'true') {
         console.log('*** SEEDING INITIATED VIA SERVER STARTUP (One-Time Execution) ***');
-        await seedUsers();
+        // Ensure your seed files (userSeeder.js) have the password hashing implemented (CRITICAL)
+        await seedUsers(); 
         await seedCrops();
         await seedFarmers();
         console.log('*** SEEDING SEQUENCE FINISHED ***');
-      }
-
-    } catch (err) {
-      // In a serverless function, log the error but allow the function to finish.
-      console.error("Failed to establish DB connection:", err?.message || err);
-      // We do NOT exit(1) as the process is expected to run as a lambda function.
     }
+
+    // 3. START THE SERVER LISTENER (The fix for the "No open ports detected" error)
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error("Failed to start server due to DB error:", err?.message || err);
+    // Render expects an exit code on fatal error
+    process.exit(1);
   }
 };
 
-// Start the asynchronous setup process immediately on module load (cold start).
-runDatabaseSetup();
+start(); 
 
-// REMOVED: const PORT = process.env.PORT || 5000;
-// REMOVED: const start = async () => { ... app.listen(PORT, ...); ... };
-// REMOVED: start();
-
-// Final required step for Vercel: Export the configured app instance
-export default app;
+// REMOVED: export default app; (This line is for Vercel Serverless, not Render Web Service)
