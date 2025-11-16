@@ -1,6 +1,4 @@
 {
-  // --- CRITICAL FIX HERE ---
-  // Tells Vercel to change directory to FrontEnd and run its build script
   "buildCommand": "cd FrontEnd && npm run build",
   
   "builds": [
@@ -33,3 +31,4 @@
     }
   ]
 }
+
