@@ -39,10 +39,10 @@ const app = express();
 
 // RENDER CORS - IMPORTANT: Use process.env.FRONTEND_URL for dynamic linking on Render.
 // You must set the FRONTEND_URL environment variable on Render if deploying separately.
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173"; 
+const FRONTEND_URL = "https://jay-kisan-nursary-1.onrender.com" || "http://localhost:5173"; 
 app.use(cors({
   origin: [
-    FRONTEND_URL, // Render will replace this with your actual frontend URL
+    "https://jay-kisan-nursary-1.onrender.com", // Render will replace this with your actual frontend URL
     "http://localhost:5173" // for local development
   ],
   credentials: true,
