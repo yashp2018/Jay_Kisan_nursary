@@ -1,8 +1,11 @@
 // src/server.js
 import express from 'express';
 import dotenv from 'dotenv';
-import connectDB from './config/db.js';
 import cors from 'cors';
+
+dotenv.config(); // load env first
+
+import connectDB from "./config/db.js"; // ensure path matches your repo
 
 // routes
 import userRoutes from './routes/userRoutes.js';
@@ -22,36 +25,16 @@ import newEntryRoutes from './routes/newEntryRoutes.js';
 import incomeRoutes from "./routes/incomeRoutes.js";
 import dailyBookingRoutes from "./routes/dailyBookingRoutes.js";
 import nutrientStockRoutes from "./routes/nutrientStockRoutes.js";
-
-dotenv.config();
-connectDB();
+import scriptRoutes from './routes/scripts.js';
 
 const app = express();
 
-import scriptRoutes from './routes/scripts.js';
-
-
-// CORS: allow only dev frontend origin, and allow credentials
-const allowedOrigins = ['http://localhost:5173']; // add other origins if needed
-const corsOptions = {
-  origin: function(origin, callback) {
-    // allow requests with no origin (like mobile apps, curl)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      return callback(null, true);
-    } else {
-      return callback(new Error('CORS policy: This origin is not allowed.'), false);
-    }
-  },
-  credentials: true,
+// Production-safe CORS configuration (you can restrict later to your frontend domain)
+app.use(cors({
   origin: "*",
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-  optionsSuccessStatus: 200
-};
-
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // preflight handling
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+}));
 
 // Body parser
 app.use(express.json());
@@ -80,6 +63,15 @@ app.use("/api/daily-bookings", dailyBookingRoutes);
 app.use("/api/nutrient-stock", nutrientStockRoutes);
 app.use('/api/scripts', scriptRoutes);
 
+// Health check endpoint
+app.get("/health", (req, res) =>
+  res.json({ status: "ok", time: new Date().toISOString() })
+);
+
+// Root route (friendly)
+app.get("/", (req, res) => {
+  res.send("API is running. Use /health for status or /api/* endpoints.");
+});
 
 // Error handler for CORS rejections (friendly message)
 app.use((err, req, res, next) => {
@@ -90,6 +82,24 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+
+const start = async () => {
+  try {
+    // DEBUG LOG: tell us whether the runtime environment has MONGO_URI set (boolean)
+    console.log("DEBUG: process.env.MONGO_URI present? ->", !!process.env.MONGO_URI);
+
+    // Wait for DB connection first (throws if connection fails)
+    await connectDB();
+
+    // Only start HTTP server if DB connection succeeded
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error("Failed to start server due to DB error:", err?.message || err);
+    // Exit so Render marks deploy as failed and you fix env
+    process.exit(1);
+  }
+};
+
+start();
