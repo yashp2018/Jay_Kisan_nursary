@@ -1,6 +1,7 @@
 import Expense from "../models/Expense.js";
 import Salary from "../models/Salary.js";
-import Labor from "../models/Labor.js";
+import Labor from "../models/labor.js";
+
 import mongoose from "mongoose";
 import DailyExpense from "../models/DailyExpense.js";
 
