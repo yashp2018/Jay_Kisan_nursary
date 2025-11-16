@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router"
 import { Leaf, Users, BarChart3, Shield, ArrowRight, Menu, X, Sparkles } from "lucide-react"
-import bgImage from "../../components/assets/image.png"
 
 export default function LandingPage() {
   const [activeSection, setActiveSection] = useState("landing")
@@ -100,12 +99,7 @@ export default function LandingPage() {
         className={`relative min-h-screen flex items-center ${activeSection === "landing" ? "block" : "hidden"}`}
       >
         {/* Background Image */}
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage: `url(${bgImage})`,
-          }}
-        >
+       
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/70 via-green-800/50 to-transparent"></div>
         </div>
 
