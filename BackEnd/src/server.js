@@ -39,7 +39,7 @@ const app = express();
 app.use(cors({
   // Use VERCEL_URL or the actual domain in production instead of hardcoding render.com
   origin: [
-   // Placeholder: Change this!
+     "https://your-frontend-app.onrender.com", // Placeholder: Change this!
     "http://localhost:5173" // for local development
   ],
   credentials: true,
