@@ -11,10 +11,10 @@ import {
   LaborManagementPage,
   StaffAddExpenses
 } from "../pages/index.js";
-import LandingPage from "../pages/LandingPage/LandingPage";
+import LandingPage from "../pages/LandingPage/LandingPage.jsx";
 import AdminExpencessPage from "../pages/expenceManagement/AdminExpencessPage.jsx";
 import AdminDashboard from "../pages/adminDashboard/AdminDashboard.jsx";
-import ProfilePage from "../pages/ProfilePage";
+import ProfilePage from "../pages/ProfilePage.jsx";
 import Unauthorized from "../pages/Unauthorized"; 
 import Notification from "../pages/NotificationPage";
 import AttendancePage from "../pages/laborManagement/AttendancePage"; 
