@@ -99,9 +99,7 @@ export default function LandingPage() {
         className={`relative min-h-screen flex items-center ${activeSection === "landing" ? "block" : "hidden"}`}
       >
         {/* Background Image */}
-       
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/70 via-green-800/50 to-transparent"></div>
-        </div>
+        <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/70 via-green-800/50 to-transparent"></div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-32">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
