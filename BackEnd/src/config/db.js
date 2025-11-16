@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 
 const connectDB = async () => {
   // Use environment variable in production; fallback to local DB for dev only
-  const uri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/plant_nursary_local";
+  const uri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/plant_nursary";
 
   try {
     console.log("Connecting to MongoDB... (using MONGO_URI?)", !!process.env.MONGO_URI);
