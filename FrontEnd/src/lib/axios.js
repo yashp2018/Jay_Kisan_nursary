@@ -1,8 +1,15 @@
 import axios from 'axios';
 
+// ------------------- NEW CODE START -------------------
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
 const instance = axios.create({
-  baseURL: 'http://localhost:5000/api',
-  withCredentials: true, // For cookies, not needed for localStorage
+  // Use the environment variable, which will be set to '/api' in production
+  // This allows relative paths on Vercel to correctly route to your backend function.
+  baseURL: API_BASE_URL, 
+// ------------------- NEW CODE END -------------------
+
+  withCredentials: true, 
   headers: {
     'Content-Type': 'application/json',
   },
