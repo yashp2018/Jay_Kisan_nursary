@@ -11,7 +11,7 @@ import {
   LaborManagementPage,
   StaffAddExpenses
 } from "../pages/index.js";
-import LandingPage from "../pages/LandingPage/LandingPage.jsx";
+import LandingPage from "../pages/landingPage/LandingPage.jsx";
 import AdminExpencessPage from "../pages/expenceManagement/AdminExpencessPage.jsx";
 import AdminDashboard from "../pages/adminDashboard/AdminDashboard.jsx";
 import ProfilePage from "../pages/ProfilePage.jsx";
