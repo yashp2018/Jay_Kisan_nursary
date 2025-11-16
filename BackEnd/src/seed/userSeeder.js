@@ -24,7 +24,7 @@ const seedUsers = async () => {
       },
       {
         staffId: 'staff001',
-        password: hashedPassword, // Store the HASHED password
+        password: pass, // Store the HASHED password
         role: 'staff',
       },
     ];
