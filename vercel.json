@@ -1,0 +1,32 @@
+{
+  "buildCommand": "npm run build",
+  "builds": [
+    {
+      "src": "FrontEnd/index.html",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "FrontEnd/dist"
+      }
+    },
+    {
+      "src": "BackEnd/api/index.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "BackEnd/src/**",
+          "BackEnd/package.json"
+        ]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "BackEnd/api/index.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "FrontEnd/dist/$1"
+    }
+  ]
+}
