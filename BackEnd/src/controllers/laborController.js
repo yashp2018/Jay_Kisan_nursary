@@ -1,4 +1,5 @@
-import Labor from "../models/labor.js";
+import Labor from '../models/labor.js';   // if controller is in src/controllers and model is in src/models
+
 
 // Add labor (either type)
 export const addLabor = async (req, res) => {
