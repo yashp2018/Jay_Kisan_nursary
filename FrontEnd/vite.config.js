@@ -4,9 +4,14 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(),
+  plugins: [
+    react(),
     tailwindcss(),
   ],
+  build: {
+    outDir: 'build', // Change from 'dist' to 'build' for Render
+    chunkSizeWarningLimit: 1000, // Increase warning limit
+  },
   server: {
     proxy: {
       '/api': {
