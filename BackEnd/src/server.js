@@ -29,9 +29,13 @@ import scriptRoutes from './routes/scripts.js';
 
 const app = express();
 
-// Production-safe CORS configuration (you can restrict later to your frontend domain)
+// Production CORS - allow your Render frontend domain
 app.use(cors({
-  origin: "*",
+  origin: [
+    "https://your-frontend-app.onrender.com",
+    "http://localhost:5173" // for local development
+  ],
+  credentials: true,
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
