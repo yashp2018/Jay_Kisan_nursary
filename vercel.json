@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd FrontEnd && npm run build",
+  "buildCommand": "cd FrontEnd ; npm run build",
   
   "builds": [
     {
@@ -31,4 +31,5 @@
     }
   ]
 }
+
 
