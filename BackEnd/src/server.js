@@ -62,25 +62,34 @@ process.on('uncaughtException', (err) => {
 
 
 // CORS config (copy-paste into server.js)
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
-  .split(',')
-  .map(u => u.trim())
-  .filter(Boolean);
-
-console.log('CORS allowedOrigins =', allowedOrigins);
-
 app.use(cors({
   origin: (origin, callback) => {
-    // origin === undefined for curl/Postman/server-side requests — allow them
+    // allow requests with no origin (curl/Postman/server-side)
     if (!origin) return callback(null, true);
 
-    // log origin for debugging
     console.log('CORS check - incoming Origin:', origin);
 
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
+    // allowedOrigins from env (comma-separated)
+    const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+      .split(',')
+      .map(u => u.trim())
+      .filter(Boolean);
+
+    // 1) exact match allowed
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+
+    // 2) allow any onrender.com subdomain (dev convenience)
+    try {
+      const url = new URL(origin);
+      if (url.hostname && url.hostname.endsWith('.onrender.com')) {
+        console.log('CORS: allowing onrender.com origin for dev:', origin);
+        return callback(null, true);
+      }
+    } catch (e) {
+      // not a valid URL string (shouldn't happen)
     }
 
+    // otherwise block
     return callback(new Error(`CORS: Origin ${origin} not allowed`), false);
   },
   credentials: true,
