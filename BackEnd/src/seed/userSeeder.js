@@ -13,15 +13,24 @@ const seedUsers = async () => {
       return;
     }
 
-    // Use env vars for default passwords if present, otherwise fallback (safe for dev only)
+    // Default passwords (dev only warning)
     const adminPlain = process.env.SEED_ADMIN_PASS || 'adminpass';
     const staffPlain = process.env.SEED_STAFF_PASS || 'staffpass';
 
+    if (!process.env.SEED_ADMIN_PASS) {
+      console.warn("⚠ WARNING: Using fallback password for admin. Set SEED_ADMIN_PASS in Render for production.");
+    }
+    if (!process.env.SEED_STAFF_PASS) {
+      console.warn("⚠ WARNING: Using fallback password for staff. Set SEED_STAFF_PASS in Render for production.");
+    }
+
     const saltRounds = parseInt(process.env.SALT_ROUNDS || '10', 10);
+
     const adminHashed = await bcrypt.hash(adminPlain, saltRounds);
     const staffHashed = await bcrypt.hash(staffPlain, saltRounds);
 
     const usersToInsert = [];
+
     if (!adminExists) {
       usersToInsert.push({
         staffId: 'admin001',
