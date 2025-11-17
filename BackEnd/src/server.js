@@ -39,12 +39,18 @@ const app = express();
 
 // RENDER CORS - IMPORTANT: Use process.env.FRONTEND_URL for dynamic linking on Render.
 // You must set the FRONTEND_URL environment variable on Render if deploying separately.
-const FRONTEND_URL = "https://jay-kisan-nursary-1.onrender.com" || "http://localhost:5173"; 
+// Build allowed origins from env (comma-separated) or use sensible defaults
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173,https://jay-kisan-nursary-1.onrender.com')
+  .split(',')
+  .map(u => u.trim());
+
 app.use(cors({
-  origin: [
-    "https://jay-kisan-nursary-1.onrender.com", // Render will replace this with your actual frontend URL
-    "http://localhost:5173" // for local development
-  ],
+  origin: (origin, callback) => {
+    // allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: Origin ${origin} not allowed`), false);
+  },
   credentials: true,
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
