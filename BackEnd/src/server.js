@@ -58,10 +58,12 @@ process.on('uncaughtException', (err) => {
   Use a comma-separated FRONTEND_URL env variable if you want multiple origins:
   e.g. FRONTEND_URL="https://prod.example.com,http://localhost:5173"
 */
-const allowedOrigins = (process.env.FRONTEND_URL || 'https://jay-kisan-nursary-1.onrender.com')
+const allowedOrigins = (process.env.FRONTEND_URL ||
+  'http://localhost:5173,https://jay-kisan-nursary-1.onrender.com'
+)
   .split(',')
-  .map(u => u.trim())
-  .filter(Boolean);
+  .map(u => u.trim());
+
 
 app.use(cors({
   origin: (origin, callback) => {
