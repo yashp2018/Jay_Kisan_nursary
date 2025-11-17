@@ -58,24 +58,36 @@ process.on('uncaughtException', (err) => {
   Use a comma-separated FRONTEND_URL env variable if you want multiple origins:
   e.g. FRONTEND_URL="https://prod.example.com,http://localhost:5173"
 */
-const allowedOrigins = (process.env.FRONTEND_URL ||
-  'http://localhost:5173,https://jay-kisan-nursary-1.onrender.com'
-)
-  .split(',')
-  .map(u => u.trim());
 
+
+
+// CORS config (copy-paste into server.js)
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+  .split(',')
+  .map(u => u.trim())
+  .filter(Boolean);
+
+console.log('CORS allowedOrigins =', allowedOrigins);
 
 app.use(cors({
   origin: (origin, callback) => {
-    // allow requests with no origin (mobile apps, curl, Postman)
+    // origin === undefined for curl/Postman/server-side requests — allow them
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error(`CORS: Origin ${origin} not allowed`), false);
+
+    // log origin for debugging
+    console.log('CORS check - incoming Origin:', origin);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS: Origin ${origin} not allowed`), false);
   },
   credentials: true,
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
+
 /* --------------------------------------------------------------------- */
 
 /* Body parser + request logging */
