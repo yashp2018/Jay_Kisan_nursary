@@ -1,21 +1,23 @@
-// BackEnd/src/server.js (FIXED for RENDER)
+// BackEnd/src/server.js
+// Final copy-paste-ready server file with improved CORS, error handling, process-level handlers,
+// conditional seeding, and debug logs for Render / local usage.
+
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 
-// IMPORTANT: Render sets its environment variables automatically, but this line ensures 
-// it loads any .env file variables if present (for local testing/setup).
-dotenv.config(); 
+// Load env as early as possible (for local dev). Render provides env vars automatically.
+dotenv.config();
 
-import connectDB from "./config/db.js"; // ensure path matches your repo
+import connectDB from "./config/db.js"; // must throw if MONGO_URI missing or connection fails
 
-// --- SEEDING IMPORTS (Required for conditional seeding) ---
-import seedUsers from './seed/userSeeder.js'; 
+// --- SEEDING IMPORTS (conditional seeding if SEED_DATABASE === 'true') ---
+import seedUsers from './seed/userSeeder.js';
 import seedCrops from './seed/cropSeed.js';
 import seedFarmers from './seed/seedFarmers.js';
-// -----------------------------------------------------------
+// ----------------------------------------------------------------------
 
-// routes
+/* ROUTES */
 import userRoutes from './routes/userRoutes.js';
 import protectedRoutes from './routes/protectedRoutes.js';
 import farmerRoutes from './routes/farmerRoutes.js';
@@ -37,16 +39,33 @@ import scriptRoutes from './routes/scripts.js';
 
 const app = express();
 
-// RENDER CORS - IMPORTANT: Use process.env.FRONTEND_URL for dynamic linking on Render.
-// You must set the FRONTEND_URL environment variable on Render if deploying separately.
-// Build allowed origins from env (comma-separated) or use sensible defaults
+/* ----------------------- Process-level handlers ----------------------- */
+// Catch unhandled promise rejections and uncaught exceptions to make logs clear.
+// You may choose to exit process on these in production.
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // optionally: process.exit(1);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception thrown:', err);
+  // optionally: process.exit(1);
+});
+/* --------------------------------------------------------------------- */
+
+/* -------------------------- CORS configuration ------------------------ */
+/*
+  Use a comma-separated FRONTEND_URL env variable if you want multiple origins:
+  e.g. FRONTEND_URL="https://prod.example.com,http://localhost:5173"
+*/
 const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173,https://jay-kisan-nursary-1.onrender.com')
   .split(',')
-  .map(u => u.trim());
+  .map(u => u.trim())
+  .filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    // allow requests with no origin (like mobile apps, curl, Postman)
+    // allow requests with no origin (mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     callback(new Error(`CORS: Origin ${origin} not allowed`), false);
@@ -55,15 +74,21 @@ app.use(cors({
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
+/* --------------------------------------------------------------------- */
 
-// Body parser
+/* Body parser + request logging */
 app.use(express.json());
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.originalUrl} - body: ${JSON.stringify(req.body)}`);
+  // Don't log large bodies in production — this is helpful in development/debugging.
+  try {
+    console.log(`${req.method} ${req.originalUrl} - body: ${JSON.stringify(req.body)}`);
+  } catch (e) {
+    console.log(`${req.method} ${req.originalUrl} - body: <unserializable>`);
+  }
   next();
 });
 
-// --- Routes
+/* ------------------------------ Routes -------------------------------- */
 app.use('/api/user', userRoutes);
 app.use('/api/protected', protectedRoutes);
 app.use('/api/farmers', farmerRoutes);
@@ -83,55 +108,67 @@ app.use("/api/daily-bookings", dailyBookingRoutes);
 app.use("/api/nutrient-stock", nutrientStockRoutes);
 app.use('/api/scripts', scriptRoutes);
 
-// Health check endpoint
+/* Health check + root */
 app.get("/health", (req, res) =>
   res.json({ status: "ok", time: new Date().toISOString() })
 );
-
-// Root route
 app.get("/", (req, res) => {
   res.send("API is running. Use /health for status or /api/* endpoints.");
 });
 
-// Error handler
+/* ---------- CORS short-circuit error middleware (keeps message clear) -------- */
 app.use((err, req, res, next) => {
   if (err && err.message && err.message.startsWith('CORS')) {
+    console.error('CORS error:', err.message);
     return res.status(403).json({ message: err.message });
   }
   next(err);
 });
 
-// RENDER REQUIRES BINDING TO THE PROCESS.ENV.PORT VARIABLE
+/* ------------------------ Final error handler (last) ------------------------ */
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  const payload = { message: err.message || 'Server error' };
+  if (process.env.NODE_ENV !== 'production') payload.stack = err.stack;
+  res.status(err.status || 500).json(payload);
+});
+/* ---------------------------------------------------------------------------- */
+
+/* RENDER: use process.env.PORT if provided */
 const PORT = process.env.PORT || 5000;
 
 const start = async () => {
   try {
     console.log("DEBUG: process.env.MONGO_URI present? ->", !!process.env.MONGO_URI);
-
-    // 1. Wait for DB connection first (throws if connection fails)
+    // 1) Connect to DB (connectDB should throw if MONGO_URI missing/invalid)
     await connectDB();
+    console.log('DB connection successful.');
 
-    // 2. Conditional Seeding (Runs only if SEED_DATABASE=true is set in Render Environment)
+    // 2) Conditional, idempotent seeding (only run when explicitly requested)
     if (process.env.SEED_DATABASE === 'true') {
-        console.log('*** SEEDING INITIATED VIA SERVER STARTUP (One-Time Execution) ***');
-        // Ensure your seed files (userSeeder.js) have the password hashing implemented (CRITICAL)
-        await seedUsers(); 
+      console.log('*** SEEDING INITIATED VIA SERVER STARTUP (SEED_DATABASE=true) ***');
+      try {
+        await seedUsers();
         await seedCrops();
         await seedFarmers();
         console.log('*** SEEDING SEQUENCE FINISHED ***');
+      } catch (seedErr) {
+        console.error('Error during seeding:', seedErr);
+        // Continue startup even if seeding fails, or decide to exit:
+        // process.exit(1);
+      }
     }
 
-    // 3. START THE SERVER LISTENER (The fix for the "No open ports detected" error)
+    // 3) Start server listener AFTER DB is ready
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
+
   } catch (err) {
-    console.error("Failed to start server due to DB error:", err?.message || err);
-    // Render expects an exit code on fatal error
+    console.error("Failed to start server due to error:", err?.message || err);
+    // Exit with failure so Render marks deploy as failed
     process.exit(1);
   }
 };
 
-start(); 
-
-// REMOVED: export default app; (This line is for Vercel Serverless, not Render Web Service)
+start();
