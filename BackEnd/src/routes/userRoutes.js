@@ -31,7 +31,7 @@ router.post('/fix-passwords', async (req, res) => {
       const pw = u.password || '';
       const needsHash = !(typeof pw === 'string' && pw.startsWith('$2'));
       if (needsHash) {
-        const plain = pw || process.env.SEED_STAFF_PASS || 'changeme';
+        const plain = pw || process.env.SEED_STAFF_PASS ;
         const hashed = await bcrypt.hash(plain, saltRounds);
         u.password = hashed;
         await u.save();
