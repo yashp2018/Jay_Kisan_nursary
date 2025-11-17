@@ -9,9 +9,12 @@ export const loginUser = async (req, res) => {
     const user = await User.findOne({ staffId });
     console.log('User found:', user);
 
-    if (!user || user.password !== password) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
+    const isMatch = await bcrypt.compare(password, user.password);
+
+if (!user || !isMatch) {
+    return res.status(401).json({ message: 'Invalid credentials' });
+}
+
 
     const token = generateToken(user._id, user.role);
     console.log('Generated token:', token);
