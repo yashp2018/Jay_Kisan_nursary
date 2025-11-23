@@ -2,6 +2,20 @@
 
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import Crop from "../../assets/Crop.jpg"
+import Crop1 from "../../assets/Crop1.jpg"
+import Crop2 from "../../assets/crop2.jpg"
+import Crop3 from "../../assets/crop3.jpg"
+
+import Tray1 from "../../assets/tray1.jpg"
+import Tray2 from "../../assets/tray2.jpg"
+import Tray3 from "../../assets/tray3.jpg"
+import Tray4 from "../../assets/tray4.jpg"
+
+import Farm from "../../assets/farm.jpg"
+import Farm1 from "../../assets/farm1.jpg"
+import Farm2 from "../../assets/farm2.jpg"
+
 import {
   FaUserCircle,
   FaUserTie,
@@ -1278,67 +1292,24 @@ const jsonLdData = {
 // gallery images – you can change these paths to your own
 const galleryImages = {
   crop: [
-    {
-      src: "/assets/Crop.jpg",
-      title: "Crop Tunnel",
-      caption: "Healthy crops growing under controlled conditions.",
-    },
-    {
-      src: "/src/assets/Crop1.jpg",
-      title: "Field Crops",
-      caption: "Wide-open field with lush seasonal crops.",
-    },
-    {
-      src: "/src/assets/crop2.jpg",
-      title: "Mixed Crop Area",
-      caption: "Different varieties managed in one block.",
-    },
-    {
-      src: "/src/assets/crop3.jpg",
-      title: "Row Crop Layout",
-      caption: "Perfect row spacing for best growth and yield.",
-    },
+    { src: Crop, title: "Crop Tunnel", caption: "Healthy crops growing under controlled conditions." },
+    { src: Crop1, title: "Field Crops", caption: "Wide-open field with lush seasonal crops." },
+    { src: Crop2, title: "Mixed Crop Area", caption: "Different varieties managed in one block." },
+    { src: Crop3, title: "Row Crop Layout", caption: "Perfect row spacing for best growth and yield." },
   ],
   tray: [
-    {
-      src: "/src/assets/tray1.jpg",
-      title: "Tray Seedlings",
-      caption: "Uniform saplings ready to be transplanted.",
-    },
-    {
-      src: "/src/assets/tray2.jpg",
-      title: "Nursery Trays",
-      caption: "Well-rooted plants in high quality trays.",
-    },
-    {
-      src: "/src/assets/tray3.jpg",
-      title: "Sprout Trays",
-      caption: "Early stage seedlings under close monitoring.",
-    },
-    {
-      src: "/src/assets/tray4.jpg",
-      title: "Hydrated Trays",
-      caption: "Regular watering ensures even growth in all cells.",
-    },
+    { src: Tray1, title: "Tray Seedlings", caption: "Uniform saplings ready to be transplanted." },
+    { src: Tray2, title: "Nursery Trays", caption: "Well-rooted plants in high quality trays." },
+    { src: Tray3, title: "Sprout Trays", caption: "Early stage seedlings under close monitoring." },
+    { src: Tray4, title: "Hydrated Trays", caption: "Regular watering ensures even growth in all cells." },
   ],
   farm: [
-    {
-      src: "/src/assets/farm.jpg",
-      title: "Main Farm Area",
-      caption: "Large scale plantation with proper irrigation.",
-    },
-    {
-      src: "/src/assets/farm1.jpg",
-      title: "Farm Walkway",
-      caption: "Walkways designed for easy access and care.",
-    },
-    {
-      src: "/src/assets/farm2.jpg",
-      title: "Open Farm View",
-      caption: "Open sky, clean air and healthy plants everywhere.",
-    },
+    { src: Farm, title: "Main Farm Area", caption: "Large scale plantation with proper irrigation." },
+    { src: Farm1, title: "Farm Walkway", caption: "Walkways designed for easy access and care." },
+    { src: Farm2, title: "Open Farm View", caption: "Open sky, clean air and healthy plants everywhere." },
   ],
 }
+
 
 const LandingPage = () => {
   const [showLoginMenu, setShowLoginMenu] = useState(false)
