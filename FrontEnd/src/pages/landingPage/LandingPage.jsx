@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
+
+// gallery images
 import Crop from "../../assets/Crop.jpg"
 import Crop1 from "../../assets/Crop1.jpg"
 import Crop2 from "../../assets/crop2.jpg"
@@ -15,6 +17,11 @@ import Tray4 from "../../assets/tray4.jpg"
 import Farm from "../../assets/farm.jpg"
 import Farm1 from "../../assets/farm1.jpg"
 import Farm2 from "../../assets/farm2.jpg"
+
+// NEW: hero, logo, about image imports
+import HeroBg from "../../assets/plant-nursery.jpg"
+import Logo from "../../assets/logo.png"
+import AboutImg from "../../assets/FarmBanner.jpg"
 
 import {
   FaUserCircle,
@@ -307,15 +314,16 @@ header.sticky {
 
 /* Hero Section */
 .hero {
-    background: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.6)),
-      url('/src/assets/plant-nursery.jpg') center/cover no-repeat;
-    background-attachment: fixed;
     min-height: 100vh;
     display: flex;
     align-items: center;
     text-align: center;
     color: var(--white);
     padding: 100px 0 60px;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
 }
 
 .hero-content {
@@ -1310,7 +1318,6 @@ const galleryImages = {
   ],
 }
 
-
 const LandingPage = () => {
   const [showLoginMenu, setShowLoginMenu] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -1496,7 +1503,7 @@ const LandingPage = () => {
         <div className="container">
           <nav className="navbar">
             <a href="#home" className="logo">
-              <img src="/src/assets/logo.png" alt="Jay Kisan Hi-Tech Nursery Logo" className="logo-img" />
+              <img src={Logo} alt="Jay Kisan Hi-Tech Nursery Logo" className="logo-img" />
               <span className="logo-text">Jay Kisan Hi-Tech Nursery</span>
             </a>
 
@@ -1564,7 +1571,13 @@ const LandingPage = () => {
         </div>
       </header>
 
-      <section id="home" className="hero">
+      <section
+        id="home"
+        className="hero"
+        style={{
+          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.6)), url(${HeroBg})`,
+        }}
+      >
         <div className="container">
           <div className="hero-content">
             <h1>Premium Saplings &amp; Hi-Tech Greenhouse Solutions</h1>
@@ -1590,13 +1603,13 @@ const LandingPage = () => {
           <div className="section-header">
             <h2>About Jay Kisan Hi-Tech Nursery</h2>
             <p>
-              With over 15 years of expertise in hi-tech horticulture, we're leaders in sustainable plant cultivation
-              and greenhouse technology.
+              With over 15 years of expertise in hi-tech horticulture, we&apos;re leaders in sustainable plant
+              cultivation and greenhouse technology.
             </p>
           </div>
           <div className="about-content">
             <div className="about-img">
-              <img src="/src/assets/FarmBanner.jpg" alt="Jay Kisan Hi-Tech Nursery greenhouse" />
+              <img src={AboutImg} alt="Jay Kisan Hi-Tech Nursery greenhouse" />
             </div>
             <div className="about-text">
               <h3>Our Story &amp; Technical Edge</h3>
@@ -1778,8 +1791,8 @@ const LandingPage = () => {
           <div className="testimonials-slider">
             <div className="testimonial-item">
               <div className="testimonial-text">
-                "Jay Kisan Hi-Tech Nursery provided us with excellent quality mango saplings. Their technical guidance
-                helped us increase yield by 30% in the first year itself."
+                &quot;Jay Kisan Hi-Tech Nursery provided us with excellent quality mango saplings. Their technical
+                guidance helped us increase yield by 30% in the first year itself.&quot;
               </div>
               <div className="testimonial-author">Sachin Thete</div>
               <div className="testimonial-role">Director, SachiTech</div>
@@ -1870,7 +1883,7 @@ const LandingPage = () => {
 
                 <div className="form-group">
                   <select className="form-control" aria-label="Service Interest">
-                    <option value="">I'm interested in...</option>
+                    <option value="">I&apos;m interested in...</option>
                     <option value="saplings">Premium Saplings</option>
                     <option value="hydroponics">Hydroponic Systems</option>
                     <option value="greenhouse">Greenhouse Setup</option>
