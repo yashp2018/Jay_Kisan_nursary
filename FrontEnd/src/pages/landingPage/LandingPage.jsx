@@ -1279,7 +1279,7 @@ const jsonLdData = {
 const galleryImages = {
   crop: [
     {
-      src: "/src/assets/Crop.jpg",
+      src: "/assets/Crop.jpg",
       title: "Crop Tunnel",
       caption: "Healthy crops growing under controlled conditions.",
     },
