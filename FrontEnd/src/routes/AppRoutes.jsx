@@ -40,10 +40,10 @@ const AppRoutes = () => {
           <Route path="/admin/bookings/:id" element={<BookingDetailsPage />} />
           <Route path="/admin/labor" element={<LaborManagementPage />} />
           <Route path="/admin/attendance/:type" element={<AttendancePage />} />
-          <Route path="/admin/expencess" element={<AdminExpencessPage />} />
+          
           <Route path="/admin/assets" element={<AssetManagementPage />} />
           <Route path="/admin/notifications" element={<Notification />} />
-          <Route path="/admin/schedule" element={<SowingSchedulePage />} /> {/* Fixed: Changed from StaffDashboardPage to SowingSchedulePage */}
+          
           <Route path="/admin/newpage" element={<NewPage />} />
         </Route>
         
