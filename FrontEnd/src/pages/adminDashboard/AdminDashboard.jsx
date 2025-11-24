@@ -642,7 +642,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Add Stock Manually Modal */}
+      {/* Add Stock Manually Modal */}https://github.com/yashp2018/Jay_Kisan_nursary/tree/main/FrontEnd/src/pages/adminDashboard
       {showAddStockModal && (
         <div
           style={{ background: "rgba(0, 0, 0, 0.5)" }}
