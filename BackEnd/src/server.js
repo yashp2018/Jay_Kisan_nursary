@@ -1,23 +1,22 @@
 // BackEnd/src/server.js
-// Final copy-paste-ready server file with improved CORS, error handling, process-level handlers,
-// conditional seeding, and debug logs for Render / local usage.
+// Clean, optimized and production-safe version with correct CORS + all routes.
 
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 
-// Load env as early as possible (for local dev). Render provides env vars automatically.
+// Load env first
 dotenv.config();
 
-import connectDB from "./config/db.js"; // must throw if MONGO_URI missing or connection fails
+// DB
+import connectDB from "./config/db.js";
 
-// --- SEEDING IMPORTS (conditional seeding if SEED_DATABASE === 'true') ---
+// Seeder scripts (optional)
 import seedUsers from './seed/userSeeder.js';
 import seedCrops from './seed/cropSeed.js';
 import seedFarmers from './seed/seedFarmers.js';
-// ----------------------------------------------------------------------
 
-/* ROUTES */
+// Routes
 import userRoutes from './routes/userRoutes.js';
 import protectedRoutes from './routes/protectedRoutes.js';
 import farmerRoutes from './routes/farmerRoutes.js';
@@ -39,79 +38,56 @@ import scriptRoutes from './routes/scripts.js';
 
 const app = express();
 
-/* ----------------------- Process-level handlers ----------------------- */
-// Catch unhandled promise rejections and uncaught exceptions to make logs clear.
-// You may choose to exit process on these in production.
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  // optionally: process.exit(1);
+/* -------------------- GLOBAL ERROR HANDLERS -------------------- */
+process.on("unhandledRejection", (reason, p) => {
+  console.error("Unhandled Rejection:", reason);
 });
-
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception thrown:', err);
-  // optionally: process.exit(1);
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
 });
-/* --------------------------------------------------------------------- */
+/* -------------------------------------------------------------- */
 
-/* -------------------------- CORS configuration ------------------------ */
-/*
-  Use a comma-separated FRONTEND_URL env variable if you want multiple origins:
-  e.g. FRONTEND_URL="https://prod.example.com,http://localhost:5173"
-*/
+/* ---------------------- FIXED CORS CONFIG ---------------------- */
 
+// Allowed frontend domains
+const allowedOrigins = [
+  "https://jaykisannursery.com",
+  "https://www.jaykisannursery.com",
+  "http://localhost:5173",
+  "http://localhost:3000"
+];
 
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true); // allow Postman / curl
 
-// CORS config (copy-paste into server.js)
-app.use(cors({
-  origin: (origin, callback) => {
-    // allow requests with no origin (curl/Postman/server-side)
-    if (!origin) return callback(null, true);
+      console.log("CORS request from:", origin);
 
-    console.log('CORS check - incoming Origin:', origin);
-
-    // allowedOrigins from env (comma-separated)
-    const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
-      .split(',')
-      .map(u => u.trim())
-      .filter(Boolean);
-
-    // 1) exact match allowed
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-
-    // 2) allow any onrender.com subdomain (dev convenience)
-    try {
-      const url = new URL(origin);
-      if (url.hostname && url.hostname.endsWith('.onrender.com')) {
-        console.log('CORS: allowing onrender.com origin for dev:', origin);
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-    } catch (e) {
-      // not a valid URL string (shouldn't happen)
-    }
 
-    // otherwise block
-    return callback(new Error(`CORS: Origin ${origin} not allowed`), false);
-  },
-  credentials: true,
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
-}));
+      return callback(new Error(`CORS: Origin ${origin} not allowed`), false);
+    },
+    credentials: true,
+    methods: "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
-/* --------------------------------------------------------------------- */
+/* -------------------------------------------------------------- */
 
-/* Body parser + request logging */
 app.use(express.json());
+
+// Debug incoming requests
 app.use((req, res, next) => {
-  // Don't log large bodies in production — this is helpful in development/debugging.
-  try {
-    console.log(`${req.method} ${req.originalUrl} - body: ${JSON.stringify(req.body)}`);
-  } catch (e) {
-    console.log(`${req.method} ${req.originalUrl} - body: <unserializable>`);
-  }
+  console.log(`[${req.method}] ${req.url}`);
   next();
 });
 
-/* ------------------------------ Routes -------------------------------- */
+/* ----------------------------- ROUTES --------------------------- */
+
 app.use('/api/user', userRoutes);
 app.use('/api/protected', protectedRoutes);
 app.use('/api/farmers', farmerRoutes);
@@ -131,67 +107,60 @@ app.use("/api/daily-bookings", dailyBookingRoutes);
 app.use("/api/nutrient-stock", nutrientStockRoutes);
 app.use('/api/scripts', scriptRoutes);
 
-/* Health check + root */
+app.get("/", (req, res) => {
+  res.send("API is working ✔");
+});
+
 app.get("/health", (req, res) =>
   res.json({ status: "ok", time: new Date().toISOString() })
 );
-app.get("/", (req, res) => {
-  res.send("API is running. Use /health for status or /api/* endpoints.");
-});
 
-/* ---------- CORS short-circuit error middleware (keeps message clear) -------- */
+/* --------------- CORS specific error handler ---------------- */
+
 app.use((err, req, res, next) => {
-  if (err && err.message && err.message.startsWith('CORS')) {
-    console.error('CORS error:', err.message);
+  if (err && err.message && err.message.startsWith("CORS")) {
+    console.error("CORS Error:", err.message);
     return res.status(403).json({ message: err.message });
   }
   next(err);
 });
 
-/* ------------------------ Final error handler (last) ------------------------ */
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  const payload = { message: err.message || 'Server error' };
-  if (process.env.NODE_ENV !== 'production') payload.stack = err.stack;
-  res.status(err.status || 500).json(payload);
-});
-/* ---------------------------------------------------------------------------- */
+/* -------------------- GENERIC ERROR HANDLER ------------------ */
 
-/* RENDER: use process.env.PORT if provided */
+app.use((err, req, res, next) => {
+  console.error("Server Error:", err);
+  res.status(err.status || 500).json({
+    message: err.message || "Internal Server Error",
+  });
+});
+
+/* ---------------------- START SERVER -------------------------- */
+
 const PORT = process.env.PORT || 5000;
 
 const start = async () => {
   try {
-    console.log("DEBUG: process.env.MONGO_URI present? ->", !!process.env.MONGO_URI);
-    // 1) Connect to DB (connectDB should throw if MONGO_URI missing/invalid)
     await connectDB();
-    console.log('DB connection successful.');
+    console.log("MongoDB Connected ✔");
 
-    // 2) Conditional, idempotent seeding (only run when explicitly requested)
-    if (process.env.SEED_DATABASE === 'true') {
-      console.log('*** SEEDING INITIATED VIA SERVER STARTUP (SEED_DATABASE=true) ***');
-      try {
-        await seedUsers();
-        await seedCrops();
-        await seedFarmers();
-        console.log('*** SEEDING SEQUENCE FINISHED ***');
-      } catch (seedErr) {
-        console.error('Error during seeding:', seedErr);
-        // Continue startup even if seeding fails, or decide to exit:
-        // process.exit(1);
-      }
+    if (process.env.SEED_DATABASE === "true") {
+      console.log("Seeding Database...");
+      await seedUsers();
+      await seedCrops();
+      await seedFarmers();
+      console.log("Seeding Completed ✔");
     }
 
-    // 3) Start server listener AFTER DB is ready
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
 
   } catch (err) {
-    console.error("Failed to start server due to error:", err?.message || err);
-    // Exit with failure so Render marks deploy as failed
+    console.error("Startup Error:", err);
     process.exit(1);
   }
 };
 
 start();
+
+export default app;
