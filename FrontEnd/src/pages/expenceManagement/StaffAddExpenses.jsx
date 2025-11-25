@@ -59,7 +59,7 @@ export default function NurseryExpenses({ editingExpense, onSave }) {
 
   const addRow = () => {
     append({
-      shop: "Shop A",
+      shop: "Garudeshwar Agro Center",
       invoice: "",
       total: 0,
       paid: 0,
@@ -182,7 +182,7 @@ export default function NurseryExpenses({ editingExpense, onSave }) {
                       {...register(`rows.${index}.shop`)}
                       className="border px-2 py-1 rounded w-full"
                     >
-                      <option>Shop A</option>
+                      <option>Garudeshwar Agro Center</option>
                       <option>Shop B</option>
                       <option>Shop C</option>
                     </select>
