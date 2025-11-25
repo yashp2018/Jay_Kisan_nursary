@@ -19,10 +19,12 @@ const LoginPage = () => {
       // save user via AuthContext (handles localStorage + state)
       login(res.data);
 
-      // navigate after context is updated
+      // Show success message and navigate after context is updated
       if (res.data.role === "admin") {
+        alert("Admin login successful!");
         navigate("/admin/dashboard", { replace: true });
       } else {
+        alert("Staff login successful!");
         navigate("/staff/dashboard", { replace: true });
       }
     } catch (err) {
