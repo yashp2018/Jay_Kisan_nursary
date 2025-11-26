@@ -73,7 +73,7 @@ export default function Header() {
           <MdMan /> Labour
         </NavLink>
 
-        {/* <NavLink
+        { <NavLink
           to={`/${basePath}/expencess`}
           className={({ isActive }) =>
             `flex items-center gap-3 px-4 py-2 rounded-lg ${
@@ -84,7 +84,7 @@ export default function Header() {
           }
         >
           <MdInsertPageBreak /> Expenses
-        </NavLink> */}
+        </NavLink> }
 
         <NavLink
           to={`/${basePath}/assets`}
@@ -98,7 +98,7 @@ export default function Header() {
         >
           <MdWebAsset /> Assets
         </NavLink>
-        {/* <NavLink
+        { <NavLink
           to={`/${basePath}/schedule`}
           className={({ isActive }) =>
             `flex items-center gap-3 px-4 py-2 rounded-lg ${
@@ -109,7 +109,7 @@ export default function Header() {
           }
         >
           <GrSchedule /> Schedule
-        </NavLink> */}
+        </NavLink> }
         <NavLink
           to={`/${basePath}/newpage`}
           className={({ isActive }) =>
