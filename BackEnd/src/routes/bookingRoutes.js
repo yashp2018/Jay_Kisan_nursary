@@ -25,11 +25,16 @@ router.delete("/:id", deleteBooking);
 
 // promote booking status
 router.patch("/:id/promote", promoteBookingStatus);
+// Add this route
 
 // pay remaining / add payment
 router.post("/:id/pay", payBooking);
 
 // get single booking (keep after more specific routes)
 router.get("/:id", getBookingById);
+
+router.post('/', protect, staffOrAdmin, createBooking);
+router.get('/', protect, staffOrAdmin, getBookings);
+
 
 export default router;
