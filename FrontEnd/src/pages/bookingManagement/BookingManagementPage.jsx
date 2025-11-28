@@ -43,11 +43,11 @@ export default function BookingManagementPage() {
     return "";
   };
 
-  // Generate Sowing Schedules
+// Generate Sowing Schedules
 const generateSowingSchedules = async () => {
   setGeneratingSchedules(true);
   try {
-    const response = await axios.post("/scripts/backfillSchedules");
+    const response = await axios.post("/schedules/backfill");
     
     alert(response.data.message || "Sowing schedules generated successfully!");
     console.log("Schedules generation response:", response.data);
