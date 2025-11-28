@@ -4,7 +4,10 @@ import { CiWheat, CiLogout } from "react-icons/ci";
 import { MdMan, MdInsertPageBreak, MdWebAsset } from "react-icons/md";
 import { FaNewspaper } from "react-icons/fa6";
 import { GrSchedule } from "react-icons/gr";
-import { useAuth } from "../../context/AuthContext"; // adjust path if needed
+import { useAuth } from "../../context/AuthContext"; 
+
+
+
 
 export default function Header() {
   const { logout, user } = useAuth();
@@ -16,10 +19,20 @@ export default function Header() {
     navigate("/login");
   };
 
+  // Admin helper: redirect to staff pages; if not logged in, force login first
+  const requireLoginAndRedirect = (targetPath) => {
+    if (!user) {
+      // not logged in -> go to login page first
+      navigate("/login");
+      return;
+    }
+    navigate(targetPath);
+  };
+
   return (
     <div className="h-screen w-64 bg-white shadow-md flex flex-col px-4 py-6">
       <h1 className="text-2xl font-bold text-blue-600 mb-8 capitalize">
-        {user?.role} Dashboard
+        {user?.role ?? "User"} Dashboard
       </h1>
       <nav className="flex flex-col gap-2">
         <NavLink
@@ -60,6 +73,7 @@ export default function Header() {
         >
           <FaBook /> Booking Form
         </NavLink>
+
         <NavLink
           to={`/${basePath}/labor`}
           className={({ isActive }) =>
@@ -73,18 +87,31 @@ export default function Header() {
           <MdMan /> Labour
         </NavLink>
 
-        { <NavLink
-          to={`/${basePath}/expencess`}
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-4 py-2 rounded-lg ${
-              isActive
-                ? "bg-blue-100 text-blue-600 font-semibold"
-                : "text-gray-700 hover:bg-gray-100"
-            }`
-          }
-        >
-          <MdInsertPageBreak /> Expenses
-        </NavLink> }
+        {/* Expenses: show normal navlink + admin-only button to open staff expenses */}
+        <div className="flex items-center justify-between px-0">
+          <NavLink
+            to={`/${basePath}/expencess`}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-2 rounded-lg w-full ${
+                isActive
+                  ? "bg-blue-100 text-blue-600 font-semibold"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`
+            }
+          >
+            <MdInsertPageBreak /> Expenses
+          </NavLink>
+
+          {user?.role === "admin" && (
+            <button
+              onClick={() => requireLoginAndRedirect("/staff/expencess")}
+              className="ml-2 px-2 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+              title="Open Staff Expenses"
+            >
+              Staff
+            </button>
+          )}
+        </div>
 
         <NavLink
           to={`/${basePath}/assets`}
@@ -98,18 +125,33 @@ export default function Header() {
         >
           <MdWebAsset /> Assets
         </NavLink>
-        { <NavLink
-          to={`/${basePath}/schedule`}
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-4 py-2 rounded-lg ${
-              isActive
-                ? "bg-blue-100 text-blue-600 font-semibold"
-                : "text-gray-700 hover:bg-gray-100"
-            }`
-          }
-        >
-          <GrSchedule /> Schedule
-        </NavLink> }
+
+        {/* Schedule: normal navlink + admin-only button to open staff schedule */}
+        <div className="flex items-center justify-between px-0">
+          <NavLink
+            to={`/${basePath}/schedule`}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-2 rounded-lg w-full ${
+                isActive
+                  ? "bg-blue-100 text-blue-600 font-semibold"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`
+            }
+          >
+            <GrSchedule /> Schedule
+          </NavLink>
+
+          {user?.role === "admin" && (
+            <button
+              onClick={() => requireLoginAndRedirect("/staff/schedule")}
+              className="ml-2 px-2 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+              title="Open Staff Schedule"
+            >
+              Staff
+            </button>
+          )}
+        </div>
+
         <NavLink
           to={`/${basePath}/newpage`}
           className={({ isActive }) =>
@@ -122,7 +164,7 @@ export default function Header() {
         >
           <FaNewspaper /> New Entry
         </NavLink>
-        
+
         <NavLink
           to={`/${basePath}/notifications`}
           className={({ isActive }) =>
