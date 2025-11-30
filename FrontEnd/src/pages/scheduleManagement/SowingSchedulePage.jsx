@@ -28,6 +28,7 @@ const SowingSchedulePage = () => {
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [debugInfo, setDebugInfo] = useState(""); // Add debug state
 
   const [selectedScheduleId, setSelectedScheduleId] = useState(null);
   const [selectedGroupId, setSelectedGroupId] = useState(null);
@@ -46,45 +47,45 @@ const SowingSchedulePage = () => {
   const fetchSchedules = useCallback(async () => {
     setLoading(true);
     setMessage("");
+    setDebugInfo("");
     try {
       const res = await axios.get("/schedules");
       const data = res.data;
 
-      if (Array.isArray(data) && data.length > 0) {
+      console.log("Raw API response:", data); // Debug log
+
+      if (Array.isArray(data)) {
+        setDebugInfo(`Received ${data.length} schedules from API`);
         
-        // --- FIX: Frontend Deduplication ---
-        const uniqueSchedulesMap = new Map();
-        data.forEach(sch => {
-            if (sch._id) {
-                 uniqueSchedulesMap.set(sch._id, sch); 
-            }
-        });
-        const uniqueSchedules = Array.from(uniqueSchedulesMap.values());
-        // --- END FIX ---
-
-        // Filter to only live schedules
-        const liveSchedules = uniqueSchedules.filter(sch => {
-          const end = new Date(sch.endDate);
-          return (!sch.status || sch.status !== "completed") && end >= new Date();
-        });
-
-        if (liveSchedules.length === 0) {
+        if (data.length === 0) {
+          setMessage("No schedules found in the system.");
           setSchedules([]);
-          setMessage("No live schedules available.");
         } else {
+          // Filter to only live schedules
+          const liveSchedules = data.filter(sch => {
+            if (!sch.endDate) return true; // Include if no end date
+            const end = new Date(sch.endDate);
+            const today = new Date();
+            return end >= today;
+          });
+
+          setDebugInfo(prev => prev + `, ${liveSchedules.length} live schedules`);
           setSchedules(liveSchedules);
-          setSelectedScheduleId(null);
-          setSelectedGroupId(null);
-          setSelectedVarietyId(null);
+          
+          if (liveSchedules.length === 0) {
+            setMessage("No active schedules found. All schedules may be completed or in the past.");
+          }
         }
       } else {
+        setDebugInfo("API returned non-array data");
+        setMessage("Invalid data format received from server.");
         setSchedules([]);
-        setMessage("No schedules data received.");
       }
     } catch (err) {
       console.error("Failed to fetch schedules:", err);
+      setDebugInfo(`Error: ${err.message}`);
+      setMessage("Error loading schedules. Check console for details.");
       setSchedules([]);
-      setMessage("Error loading schedules.");
     } finally {
       setLoading(false);
     }
@@ -94,10 +95,19 @@ const SowingSchedulePage = () => {
     fetchSchedules();
   }, [fetchSchedules]);
 
-  // FIX: Use robust ID access
-  const currentSchedule = schedules.find(s => s._id === selectedScheduleId);
-  const currentGroup = currentSchedule?.groups?.find(g => String(g.groupId || g.groupRef) === selectedGroupId) || null;
-  const currentVariety = currentGroup?.varieties?.find(v => String(v.varietyId || v.varietyRef) === selectedVarietyId) || null;
+  // More robust ID access with fallbacks
+  const currentSchedule = schedules.find(s => 
+    s._id === selectedScheduleId || 
+    String(s._id) === String(selectedScheduleId)
+  );
+
+  const currentGroup = currentSchedule?.groups?.find(g => 
+    String(g.groupId || g._id || g.groupRef) === String(selectedGroupId)
+  ) || null;
+
+  const currentVariety = currentGroup?.varieties?.find(v => 
+    String(v.varietyId || v._id || v.varietyRef) === String(selectedVarietyId)
+  ) || null;
 
   const currentTotal = currentVariety?.total || 0;
   const currentCompleted = currentVariety?.completed || 0;
@@ -105,25 +115,32 @@ const SowingSchedulePage = () => {
   const percent = currentTotal ? (currentCompleted / currentTotal) * 100 : 0;
 
   const handleScheduleChange = (e) => {
-    const sid = e.target.value || null;
-    setSelectedScheduleId(sid ? String(sid) : null);
+    const sid = e.target.value;
+    setSelectedScheduleId(sid);
     setSelectedGroupId(null);
     setSelectedVarietyId(null);
     setMessage("");
+    
+    // Debug selected schedule
+    const selected = schedules.find(s => String(s._id) === String(sid));
+    console.log("Selected schedule:", selected);
   };
 
   const handleGroupChange = (e) => {
-    const gid = e.target.value || null;
-    setSelectedGroupId(gid ? String(gid) : null);
+    const gid = e.target.value;
+    setSelectedGroupId(gid);
     setSelectedVarietyId(null);
     setMessage("");
+    
+    const schedule = schedules.find(s => String(s._id) === String(selectedScheduleId));
+    const group = schedule?.groups?.find(g => String(g.groupId || g._id || g.groupRef) === String(gid));
+    console.log("Selected group:", group);
   };
 
   const handleVarietyChange = (e) => {
     setSelectedVarietyId(e.target.value);
     setMessage("");
   };
-
 
   const handleAddCompleted = async () => {
     const added = parseInt(completedQtyInput, 10);
@@ -170,7 +187,6 @@ const SowingSchedulePage = () => {
     );
   }
 
-
   // RENDER MAIN COMPONENT
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 p-5 font-inter">
@@ -180,7 +196,21 @@ const SowingSchedulePage = () => {
         </h1>
       </div>
 
+      {/* Add debug info display */}
+      <div className="max-w-7xl mx-auto p-4 bg-yellow-100 border border-yellow-400 rounded-lg mb-4">
+        <h3 className="font-bold text-yellow-800">Debug Info:</h3>
+        <p className="text-sm text-yellow-700">
+          Schedules: {schedules.length} | 
+          Selected Schedule: {selectedScheduleId || 'none'} | 
+          Selected Group: {selectedGroupId || 'none'} | 
+          Selected Variety: {selectedVarietyId || 'none'}
+        </p>
+        <p className="text-xs text-yellow-600 mt-1">{debugInfo}</p>
+      </div>
+
       <div className="max-w-7xl mx-auto flex flex-col gap-6">
+        {/* THE REST OF YOUR EXISTING JSX REMAINS THE SAME */}
+        {/* Task Completion Panel */}
         <div id="taskCompletionPanel" className="bg-white p-5 rounded-xl shadow border border-gray-100">
           <h2 className="text-xl font-bold text-gray-800 mb-4 pb-2 border-b-2 border-gray-200">
             Task Completion Update
