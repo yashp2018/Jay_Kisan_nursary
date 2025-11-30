@@ -1,14 +1,12 @@
-// src/models/Schedule.js
 import mongoose from "mongoose";
 const { Schema } = mongoose;
 
 const BookingRefSchema = new Schema(
   {
     bookingId: { type: Schema.Types.ObjectId, ref: "Booking", default: null },
-    farmerRegistrationNo: { type: String, default: null }, // <-- use registrationNo as FK
-    farmerName: { type: String, default: null }, // cached name (optional but handy)
+    farmerRegistrationNo: { type: String, default: null },
+    farmerName: { type: String, default: null },
     quantity: { type: Number, default: 0 },
-    // optional snapshot of booking date/plot if you want:
     bookingDate: { type: Date, default: null },
     plotNumber: { type: String, default: null },
   },
@@ -42,6 +40,7 @@ const ScheduleSchema = new Schema(
     endDate: { type: Date, required: true, index: true },
     status: { type: String, enum: ["pending", "ongoing", "completed"], default: "pending" },
     groups: { type: [GroupSchema], default: [] },
+    isSowingSchedule: { type: Boolean, default: false }, // ← ADD THIS LINE
   },
   { timestamps: true }
 );
