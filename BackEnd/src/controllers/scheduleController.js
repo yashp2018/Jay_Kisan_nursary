@@ -20,9 +20,11 @@ const idStr = (docOrId) => {
  * Returns schedules that are either the new sowing type OR are still ongoing (endDate >= today).
  */
 export const getOngoingAndUpcomingSchedules = async (req, res) => {
- try {
+  try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    console.log("Fetching schedules with date:", today);
 
     // --- FINAL FIX: Broaden the Filter for Visibility (Goal: Show all live schedules) ---
     // Includes schedules created by new logic (isSowingSchedule: true) OR any schedule whose end date is today or later.
@@ -34,23 +36,20 @@ export const getOngoingAndUpcomingSchedules = async (req, res) => {
     }).sort({ startDate: 1 }).lean();
     
     // --- Post-Query Deduplication (Final Safety Measure against DB duplicates) ---
-    const finalSchedulesMap = new Map(); 
-    schedules.forEach(sch => {
-        const key = `${sch.startDate.toISOString()}-${sch.endDate.toISOString()}`;
-        
-        // Prioritize the correct, aggregated schedule (isSowingSchedule: true) 
-        // over the messy legacy duplicate for the same date range.
-        if (sch.isSowingSchedule || !finalSchedulesMap.has(key)) {
-            finalSchedulesMap.set(key, sch);
-        }
-    });
+    let schedules = await Schedule.find({
+      $or: [
+        { isSowingSchedule: true },
+        { endDate: { $gte: today } }
+      ]
+    }).sort({ startDate: 1 }).lean();
 
-    schedules = Array.from(finalSchedulesMap.values());
+    console.log(`Found ${schedules.length} schedules from database`); // Debug log
+
     // --- End Deduplication ---
 
 
     // Collect ids for batch lookup
-    const varietyIds = new Set();
+const varietyIds = new Set();
     const cropGroupIds = new Set();
     const bookingIds = new Set();
     const farmerObjIds = new Set();
@@ -76,6 +75,7 @@ export const getOngoingAndUpcomingSchedules = async (req, res) => {
       }
     }
 
+    // Debug log
     // Batch fetch (using 'new mongoose.Types.ObjectId' for Task 3 compliance)
     const [varietyDocs, cropGroupDocs, bookingDocs, farmerByIdDocs, farmerByRegDocs] = await Promise.all([
       varietyIds.size ? CropVariety.find({ _id: { $in: Array.from(varietyIds).map(id => new mongoose.Types.ObjectId(id)) } }).lean() : Promise.resolve([]),
