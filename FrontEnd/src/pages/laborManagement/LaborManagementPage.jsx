@@ -1,14 +1,10 @@
 /*
 File: src/pages/LaborPage.jsx
-Description: Labor management page with tabbed filtering, search, pagination, attendance summary, and consistent theme.
-- Updated to work with the new backend routes:
-  - GET /attendance/attendance?month=YYYY-MM&type=all|wages|regular
-  - POST /attendance/pay-salary  { laborId, month }
-- Optimistic UI when paying: sets status to "completed" locally then refetches attendance to ensure canonical state.
-- Normalizes status values from backend (handles pending/paid/completed, different casings).
+Description: Labour management page with tabs, search, pagination,
+attendance summary, driver KM payment, and mini calendar per labour.
 */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import axios from "../../lib/axios";
 import LaborModal from "./LaborModel";
 import LaborForm from "./LaborForm";
@@ -43,6 +39,8 @@ const defaultForm = {
   address: "",
   salary: "",
   dailyWages: "",
+  startKm: "",
+  endKm: "",
   status: "active",
   joiningDate: "",
 };
@@ -85,23 +83,44 @@ export default function LaborPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
-  // Attendance section (added inline)
+  // Attendance section (summary)
   const months = getMonthOptions(12);
   const [selectedMonth, setSelectedMonth] = useState(months[0].value);
   const [attendance, setAttendance] = useState([]);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [payingId, setPayingId] = useState(null);
 
-  // New: attendance tabs (All / Regular / Wages)
+  // Attendance tabs (All / Regular / Wages / Driver)
   const [attendanceTab, setAttendanceTab] = useState("All");
+
+  // Per-row attendance dropdown state for main table
+  // value: "" | "present" | "absent" | "half-day" | "other"
+  const [rowAttendance, setRowAttendance] = useState({});
+
+  // --- calendar helpers for current month ---
+  const today = new Date();
+  const todayYear = today.getFullYear();
+  const todayMonth = today.getMonth() + 1;
+  const todayDate = today.getDate();
+  const currentMonthKey = `${todayYear}-${String(todayMonth).padStart(2, "0")}`;
+
+  const isSelectedCurrentMonth = selectedMonth === currentMonthKey;
+
+  // array: [1..daysInSelectedMonth]
+  const daysInMonthArray = useMemo(() => {
+    const [yearStr, monthStr] = String(selectedMonth).split("-");
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    if (!year || !month) return [];
+    const days = new Date(year, month, 0).getDate();
+    return Array.from({ length: days }, (_, i) => i + 1);
+  }, [selectedMonth]);
 
   useEffect(() => {
     fetchLabors();
   }, [activeTab]);
 
   useEffect(() => {
-    // If user selected a specific attendance type but labors aren't loaded yet,
-    // wait until labors are fetched to avoid wrong cross-reference filtering
     if (attendanceTab !== "All" && labors.length === 0) return;
     fetchAttendance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,7 +137,8 @@ export default function LaborPage() {
       }
 
       setLabors(data);
-    } catch {
+    } catch (err) {
+      console.error("fetchLabors error:", err?.response || err);
       const fallback =
         activeTab === "All"
           ? defaultData
@@ -138,10 +158,9 @@ export default function LaborPage() {
         `/attendance/attendance?month=${selectedMonth}${typeParam}`
       );
 
-      // raw data from backend
       let data = Array.isArray(res.data.data) ? res.data.data : [];
 
-      // 1) Normalize id field -> always use `labourId` (string)
+      // normalize id field
       data = data.map((d) => {
         const id =
           d.labourId ||
@@ -152,11 +171,9 @@ export default function LaborPage() {
         return { ...d, labourId: id ? String(id) : undefined };
       });
 
-      // 2) If filtering by attendanceTab, either use type on record or cross-ref with labors
       if (attendanceTab !== "All") {
         const refLabors = labors && labors.length ? labors : defaultData;
 
-        // if backend already returns `type` on each attendance row, filter by that
         if (
           data.length > 0 &&
           data.every((d) => typeof d.type !== "undefined")
@@ -165,21 +182,18 @@ export default function LaborPage() {
             (d) => (d.type || "").toLowerCase() === attendanceTab.toLowerCase()
           );
         } else {
-          // build map of id -> type from labors (make keys strings)
           const idToType = {};
           refLabors.forEach((l) => {
             const key = String(l._id || l.labourId || l.id);
             idToType[key] = (l.type || "").toLowerCase();
           });
 
-          // filter attendance rows by looking up the labour's type from `idToType`
           data = data.filter(
             (d) => idToType[String(d.labourId)] === attendanceTab.toLowerCase()
           );
         }
       }
 
-      // normalize status -> string
       const normalized = data.map((r) => ({
         ...r,
         status: String(r.status || "pending"),
@@ -189,7 +203,6 @@ export default function LaborPage() {
     } catch (err) {
       console.error("fetchAttendance error:", err?.response || err);
 
-      // temporary fallback
       const fallback = [
         {
           labourId: "L001",
@@ -231,8 +244,13 @@ export default function LaborPage() {
 
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this employee?")) {
-      await axios.delete(`/labors/${id}`);
-      fetchLabors();
+      try {
+        await axios.delete(`/labors/${id}`);
+        fetchLabors();
+      } catch (err) {
+        console.error("delete labour error:", err?.response || err);
+        alert("Failed to delete. Check console for details.");
+      }
     }
   };
 
@@ -243,9 +261,12 @@ export default function LaborPage() {
       address: labor.address,
       salary: labor.salary || "",
       dailyWages: labor.dailyWages || "",
+      startKm: labor.startKm || "",
+      endKm: labor.endKm || "",
       status: labor.status || "active",
       joiningDate: labor.joiningDate?.slice(0, 10),
     });
+
     setFormType(labor.type);
     setIsEditing(true);
     setEditingId(labor._id);
@@ -261,13 +282,21 @@ export default function LaborPage() {
     e.preventDefault();
     const payload = { ...formData, type: formType };
     try {
-      isEditing
-        ? await axios.put(`/labors/${editingId}`, payload)
-        : await axios.post("/labors", payload);
+      if (isEditing) {
+        await axios.put(`/labors/${editingId}`, payload);
+      } else {
+        await axios.post("/labors", payload);
+      }
       fetchLabors();
       onCloseModal();
     } catch (err) {
-      console.error(err);
+      console.error("save labour error:", err?.response || err);
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Failed to save labour. Check console for details.";
+      alert(msg);
     }
   };
 
@@ -308,18 +337,15 @@ export default function LaborPage() {
     setPayingId(labourId);
     const prev = [...attendance];
 
-    // optimistic UI: mark as 'paid' locally so user sees immediate change
     setAttendance((a) =>
       a.map((r) => (r.labourId === labourId ? { ...r, status: "paid" } : r))
     );
 
     try {
-      // POST to new backend endpoint
       await axios.post(`/attendance/pay-salary`, {
         laborId: labourId,
         month: selectedMonth,
       });
-      // After success, refetch to get canonical state (status = paid as per backend)
       await fetchAttendance();
     } catch (err) {
       console.error("pay error:", err?.response || err);
@@ -368,8 +394,9 @@ export default function LaborPage() {
       <AttendanceSection />
 
       <div className="bg-white shadow rounded-lg p-6">
+        {/* Top labour tabs: All / Regular / Wages / Driver */}
         <div className="mb-4 flex gap-3 ">
-          {["All", "Regular", "Wages"].map((tab) => (
+          {["All", "Regular", "Wages", "Driver"].map((tab) => (
             <button
               key={tab}
               onClick={() => {
@@ -425,60 +452,211 @@ export default function LaborPage() {
           <table className="min-w-full bg-white shadow rounded-lg text-left">
             <thead>
               <tr className="bg-gray-100">
+                <th className="p-2">SR</th>
                 <th className="p-2">Name</th>
                 <th className="p-2">Type</th>
-                <th className="p-2">Contact</th>
-                <th className="p-2">Address</th>
-                <th className="p-2">Joining Date</th>
-                <th className="p-2">Salary/Wages</th>
-                <th className="p-2">Status</th>
+                <th className="p-2">Mobile</th>
+                <th className="p-2">Amount</th>
+                <th className="p-2">
+                  Attendance
+                  <span className="block text-[11px] text-gray-500">
+                    (Today &amp; month)
+                  </span>
+                </th>
+                <th className="p-2">Paid Now</th>
+                <th className="p-2">Driver</th>
                 <th className="p-2">Actions</th>
               </tr>
             </thead>
             <tbody>
               {currentLabors.length > 0 ? (
-                currentLabors.map((l) => (
-                  <tr key={l._id}>
-                    <td className="p-2">{l.fullName}</td>
-                    <td className="p-2 capitalize">{l.type}</td>
-                    <td className="p-2">{l.contactNumber}</td>
-                    <td className="p-2">{l.address}</td>
-                    <td className="p-2">
-                      {new Date(l.joiningDate).toLocaleDateString()}
-                    </td>
-                    <td className="p-2">
-                      {l.type === "regular"
-                        ? `₹${l.salary || "—"}`
-                        : `₹${l.dailyWages || "—"}/day`}
-                    </td>
-                    <td className="p-2">
-                      <span
-                        className={`px-2 py-1 rounded text-white text-xs ${getStatusClass(
-                          l.status
-                        )}`}
-                      >
-                        {l.status}
-                      </span>
-                    </td>
-                    <td className="p-2 flex gap-2 justify-center">
-                      <button
-                        onClick={() => handleEdit(l)}
-                        className="bg-blue-500 text-white px-2 py-1 rounded"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(l._id)}
-                        className="bg-red-500 text-white px-2 py-1 rounded"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                currentLabors.map((l, idx) => {
+                  const sr = indexOfFirst + idx + 1;
+
+                  // default "" -> "Select Option"
+                  const dropdownValue =
+                    rowAttendance[l._id] ?? "";
+
+                  return (
+                    <tr key={l._id}>
+                      <td className="p-2">{sr}</td>
+                      <td className="p-2">{l.fullName}</td>
+                      <td className="p-2 capitalize">{l.type}</td>
+                      <td className="p-2">{l.contactNumber}</td>
+
+                      {/* Amount column */}
+                      <td className="p-2">
+                        {l.type === "regular"
+                          ? `₹${l.salary || "—"}`
+                          : `₹${l.dailyWages || "—"}/day`}
+                      </td>
+
+                      {/* Attendance: dropdown + mini calendar for month */}
+                      <td className="p-2 align-top">
+                        {(() => {
+                          const isCalendarType =
+                            l.type === "regular" || l.type === "wages";
+
+                          const status = dropdownValue;
+
+                          let highlightClass =
+                            "bg-gray-200 text-gray-800 border-gray-300";
+                          if (status === "present")
+                            highlightClass =
+                              "bg-green-500 text-white border-green-500";
+                          else if (status === "absent")
+                            highlightClass =
+                              "bg-red-500 text-white border-red-500";
+                          else if (status === "half-day")
+                            highlightClass =
+                              "bg-orange-400 text-white border-orange-400";
+
+                          return (
+                            <div className="flex flex-col gap-2">
+                              {/* Dropdown */}
+                              <select
+                                value={status}
+                                onChange={async (e) => {
+                                  const val = e.target.value;
+
+                                  // if user clicks placeholder, do nothing
+                                  if (!val) return;
+
+                                  const previousValue =
+                                    rowAttendance[l._id] ?? "";
+
+                                  // 1) Update UI immediately
+                                  setRowAttendance((prev) => ({
+                                    ...prev,
+                                    [l._id]: val,
+                                  }));
+
+                                  // 2) Build payload for backend
+                                  const todayStr = new Date()
+                                    .toISOString()
+                                    .slice(0, 10); // YYYY-MM-DD
+
+                                  try {
+                                    await axios.post("/attendance/mark", {
+                                      labourId: l._id,
+                                      status: val, // "present" | "absent" | "half-day" | "other"
+                                      date: todayStr, // exact date
+                                      month: selectedMonth, // "YYYY-MM" for Monthly Attendance
+                                      type: l.type,
+                                      salary: l.salary || 0,
+                                      dailyWages: l.dailyWages || 0,
+                                    });
+
+                                    // 3) Refresh bottom Monthly Attendance Summary table
+                                    await fetchAttendance();
+                                  } catch (err) {
+                                    console.error(
+                                      "attendance mark error:",
+                                      err?.response || err
+                                    );
+                                    alert(
+                                      "Failed to update attendance. Please try again."
+                                    );
+                                    // revert dropdown if API failed
+                                    setRowAttendance((prev) => ({
+                                      ...prev,
+                                      [l._id]: previousValue,
+                                    }));
+                                  }
+                                }}
+                                className="border px-2 py-1 rounded text-sm"
+                              >
+                                {/* Placeholder first */}
+                                <option value="" disabled>
+                                  Select Option
+                                </option>
+                                <option value="present">Present</option>
+                                <option value="absent">Absent</option>
+                                <option value="half-day">Half Day</option>
+                                <option value="other">Other Reason</option>
+                              </select>
+
+                              {/* Mini month calendar strip (only for Regular & Wages) */}
+                              {isCalendarType && (
+                                <div className="mt-1">
+                                  <div className="flex flex-wrap gap-[2px] max-w-[220px]">
+                                    {daysInMonthArray.map((day) => {
+                                      const isTodayHighlight =
+                                        isSelectedCurrentMonth &&
+                                        day === todayDate;
+
+                                      const base =
+                                        "w-6 h-6 flex items-center justify-center text-[10px] rounded-sm border";
+
+                                      const className = isTodayHighlight
+                                        ? `${base} ${highlightClass}`
+                                        : `${base} bg-gray-50 text-gray-600 border-gray-300`;
+
+                                      return (
+                                        <div key={day} className={className}>
+                                          {day}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  <div className="mt-1 text-[10px] text-gray-500">
+                                    Today:{" "}
+                                    {isSelectedCurrentMonth
+                                      ? todayDate
+                                      : "Not in selected month"}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </td>
+
+                      {/* Paid Now column (salary/wages payment) */}
+                      <td className="p-2">
+                        <button
+                          onClick={() => handlePayNow(l._id)}
+                          className="bg-green-500 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
+                          disabled={payingId === l._id}
+                        >
+                          {payingId === l._id ? "Processing..." : "Pay Now"}
+                        </button>
+                      </td>
+
+                      {/* Driver-only column: opens popup for km-based pay */}
+                      <td className="p-2">
+                        {l.type === "driver" ? (
+                          <DriverKmButton
+                            labour={l}
+                            selectedMonth={selectedMonth}
+                            fetchAttendance={fetchAttendance}
+                          />
+                        ) : (
+                          <span className="text-gray-400 text-sm">—</span>
+                        )}
+                      </td>
+
+                      {/* Edit / Delete */}
+                      <td className="p-2 flex gap-2 justify-center">
+                        <button
+                          onClick={() => handleEdit(l)}
+                          className="bg-blue-500 text-white px-2 py-1 rounded"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(l._id)}
+                          className="bg-red-500 text-white px-2 py-1 rounded"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan="8" className="p-4 text-center text-gray-500">
+                  <td colSpan="9" className="p-4 text-center text-gray-500">
                     No labors found.
                   </td>
                 </tr>
@@ -538,6 +716,12 @@ export default function LaborPage() {
                 >
                   Wages-Based Employee
                 </button>
+                <button
+                  onClick={() => setFormType("driver")}
+                  className="w-full bg-purple-600 text-white py-2 rounded"
+                >
+                  Driver
+                </button>
               </div>
             ) : (
               <LaborForm
@@ -553,15 +737,15 @@ export default function LaborPage() {
         )}
       </div>
 
-      {/* --- Monthly Attendance Summary (inserted below labour details) --- */}
+      {/* --- Monthly Attendance Summary --- */}
       <div className="bg-white shadow rounded-lg p-6 mt-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">Monthly Attendance Summary</h2>
 
           <div className="flex gap-3 items-center">
-            {/* Attendance tabs */}
+            {/* Attendance tabs: All / Regular / Wages / Driver */}
             <div className="flex gap-2">
-              {["All", "Regular", "Wages"].map((t) => (
+              {["All", "Regular", "Wages", "Driver"].map((t) => (
                 <button
                   key={t}
                   onClick={() => setAttendanceTab(t)}
@@ -615,7 +799,6 @@ export default function LaborPage() {
                   <tr key={a.labourId}>
                     <td className="p-2 ">{a.name}</td>
                     <td className="p-2">{a.present}</td>
-
                     <td className="p-2">{a.absent}</td>
                     <td className="p-2">{a.totalDays}</td>
                     <td className="p-2">
@@ -664,5 +847,149 @@ export default function LaborPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/* ---------------- Driver payment popup component (only for drivers) ---------------- */
+
+function DriverKmButton({ labour, selectedMonth, fetchAttendance }) {
+  const [open, setOpen] = useState(false);
+  const [startKm, setStartKm] = useState("");
+  const [endKm, setEndKm] = useState("");
+  const [ratePerKm, setRatePerKm] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const distance = (() => {
+    const s = Number(startKm);
+    const e = Number(endKm);
+    if (isNaN(s) || isNaN(e)) return 0;
+    return Math.max(0, e - s);
+  })();
+
+  const totalAmount = distance * Number(ratePerKm || 0);
+
+  const handleSubmit = async () => {
+    if (!window.confirm("Confirm driver payment?")) return;
+
+    if (distance <= 0) {
+      alert("End KM must be greater than Start KM.");
+      return;
+    }
+    if (!(Number(ratePerKm) > 0)) {
+      alert("Enter valid rate per KM.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await axios.post("/attendance/pay-salary", {
+        laborId: labour._id,
+        month: selectedMonth,
+        type: "driver",
+        startKm: Number(startKm),
+        endKm: Number(endKm),
+        ratePerKm: Number(ratePerKm),
+        totalAmount,
+      });
+
+      await fetchAttendance();
+      setOpen(false);
+      setStartKm("");
+      setEndKm("");
+      setRatePerKm("");
+      alert("Driver payment recorded successfully.");
+    } catch (err) {
+      console.error("driver payment error:", err?.response || err);
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Failed to record driver payment. Try again.";
+      alert(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="bg-indigo-600 text-white px-3 py-1 rounded text-sm"
+      >
+        Pay (Driver)
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => !submitting && setOpen(false)}
+          />
+          <div className="relative bg-white rounded-lg shadow-lg w-full max-w-md p-6 z-10">
+            <h3 className="text-lg font-semibold mb-3">Driver Payment</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Driver: <strong>{labour.fullName}</strong>
+            </p>
+
+            <label className="block text-sm mb-1">Start KM</label>
+            <input
+              type="number"
+              value={startKm}
+              onChange={(e) => setStartKm(e.target.value)}
+              className="w-full border px-3 py-2 rounded mb-3"
+              min="0"
+            />
+
+            <label className="block text-sm mb-1">End KM</label>
+            <input
+              type="number"
+              value={endKm}
+              onChange={(e) => setEndKm(e.target.value)}
+              className="w-full border px-3 py-2 rounded mb-3"
+              min="0"
+            />
+
+            <label className="block text-sm mb-1">Rate per KM (₹)</label>
+            <input
+              type="number"
+              value={ratePerKm}
+              onChange={(e) => setRatePerKm(e.target.value)}
+              className="w-full border px-3 py-2 rounded mb-3"
+              min="0"
+            />
+
+            <div className="mb-4 p-3 bg-gray-50 rounded text-sm">
+              <div>
+                Distance: <strong>{distance} km</strong>
+              </div>
+              <div>
+                Total Amount:{" "}
+                <strong>₹{Number(totalAmount).toLocaleString()}</strong>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => !submitting && setOpen(false)}
+                className="px-4 py-2 rounded border"
+                disabled={submitting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                className="px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50"
+                disabled={submitting}
+              >
+                {submitting
+                  ? "Processing..."
+                  : `Pay ₹${Number(totalAmount).toLocaleString()}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
